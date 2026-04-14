@@ -8,7 +8,7 @@
 # This means VITE_API_BASE_URL=/api/v1 works in BOTH local dev and production
 [[redirects]]
   from = "/api/*"
-  to = ":BACKEND_URL/api/:splat"
+  to = "https://initiative-dsl-reductions-change.trycloudflare.com/api/:splat"
   status = 200
   force = true
 
