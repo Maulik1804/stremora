@@ -26,14 +26,16 @@ const USER_ROLES = Object.freeze({
   ADMIN: 'admin',
 });
 
-// secure: false and sameSite: 'lax' so the cookie works over HTTP on LAN
-// (set secure: true and sameSite: 'strict' only in production with HTTPS)
+// In production the frontend (Netlify) and backend (Cloudflare) are on different
+// domains — that is cross-site. Browsers block cookies with sameSite:'strict' or
+// sameSite:'lax' on cross-site requests, so we MUST use sameSite:'none' + secure:true.
+// In development both run on localhost so 'lax' is fine.
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 const COOKIE_OPTIONS = Object.freeze({
   httpOnly: true,
-  secure: IS_PROD,
-  sameSite: IS_PROD ? 'strict' : 'lax',
+  secure: IS_PROD,                      // must be true when sameSite:'none'
+  sameSite: IS_PROD ? 'none' : 'lax',  // 'none' required for cross-site (Netlify → Cloudflare)
 });
 
 const REFRESH_TOKEN_COOKIE_NAME = 'refreshToken';

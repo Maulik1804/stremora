@@ -52,13 +52,17 @@ const getSkipSegments = asyncHandler(async (req, res) => {
     .select('skipSegments duration')
     .lean();
 
-  if (!video) throw new ApiError(404, 'Video not found');
+  // Return empty segments instead of 404 — frontend calls this on every video load
+  if (!video) {
+    return res.status(200).json(new ApiResponse(200, { segments: [], duration: 0 }));
+  }
 
-  // Only return segments marked by >= 3 users (or 1 for dev)
+  // Guard against old DB documents that don't have skipSegments field yet
+  const skipSegments = video.skipSegments || [];
   const SKIP_THRESHOLD = parseInt(process.env.SKIP_THRESHOLD) || 1;
-  const segments = video.skipSegments.filter((s) => s.count >= SKIP_THRESHOLD);
+  const segments = skipSegments.filter((s) => s.count >= SKIP_THRESHOLD);
 
-  return res.status(200).json(new ApiResponse(200, { segments, duration: video.duration }));
+  return res.status(200).json(new ApiResponse(200, { segments, duration: video.duration || 0 }));
 });
 
 // ── Feature 3: Engagement Graph ───────────────────────────────────────────────
@@ -109,12 +113,15 @@ const getEngagement = asyncHandler(async (req, res) => {
     .select('engagementBuckets duration')
     .lean();
 
-  if (!video) throw new ApiError(404, 'Video not found');
+  // Return empty data instead of 404 — frontend calls this on every video load
+  if (!video) {
+    return res.status(200).json(
+      new ApiResponse(200, { buckets: [], raw: [], bucketSize: BUCKET_SIZE, duration: 0 })
+    );
+  }
 
   const buckets = video.engagementBuckets || [];
   const max = Math.max(...buckets, 1);
-
-  // Normalize to 0–100 for frontend rendering
   const normalized = buckets.map((v) => Math.round((v / max) * 100));
 
   return res.status(200).json(

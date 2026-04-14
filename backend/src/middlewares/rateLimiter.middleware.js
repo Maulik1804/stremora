@@ -15,11 +15,14 @@ const globalRateLimiter = rateLimit({
   },
 });
 
+// Auth rate limiter — only applies to login, register, forgot-password
+// NOT applied to /refresh (the app calls that automatically on every load)
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,
+  max: 30,                   // raised from 10 — allows normal usage without false 429s
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === '/refresh', // never rate-limit token refresh
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again later.',

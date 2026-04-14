@@ -107,9 +107,7 @@ const searchKeywords = asyncHandler(async (req, res) => {
   if (!video) throw new ApiError(404, 'Video not found');
 
   const term = q.trim().toLowerCase();
-  const matches = (video.keywords || []).filter((k) =>
-    k.word.includes(term)
-  );
+  const matches = (video.keywords || []).filter((k) => k.word && k.word.includes(term));
 
   return res.status(200).json(new ApiResponse(200, { matches, total: matches.length }));
 });
