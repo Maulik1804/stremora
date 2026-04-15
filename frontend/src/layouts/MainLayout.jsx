@@ -6,6 +6,7 @@ import Navbar from '../components/layout/Navbar';
 import Sidebar from '../components/layout/Sidebar';
 import { selectSidebarExpanded, setSidebarExpanded } from '../store/slices/sidebarSlice';
 import { selectFocusMode } from '../store/slices/focusSlice';
+import { useWindowWidth } from '../hooks/useWindowWidth';
 
 const pageVariants = {
   initial: { opacity: 0, y: 10 },
@@ -18,27 +19,25 @@ const MainLayout = () => {
   const focusMode = useSelector(selectFocusMode);
   const dispatch = useDispatch();
   const location = useLocation();
+  const windowWidth = useWindowWidth();
 
+  // Scroll to top on route change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [location.pathname]);
 
+  // Collapse to icon-only on medium screens
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024 && window.innerWidth >= 768) {
-        dispatch(setSidebarExpanded(false));
-      }
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [dispatch]);
+    if (windowWidth >= 768 && windowWidth < 1024) {
+      dispatch(setSidebarExpanded(false));
+    }
+  }, [windowWidth, dispatch]);
 
-  const sidebarWidth = focusMode
+  // Sidebar pushes content only on desktop (md+); mobile uses overlay drawer
+  const isMobile = windowWidth < 768;
+  const sidebarWidth = focusMode || isMobile
     ? 0
-    : typeof window !== 'undefined' && window.innerWidth < 768
-      ? 0
-      : isExpanded ? 232 : 68;
+    : isExpanded ? 232 : 68;
 
   return (
     <div className={`min-h-screen bg-[#080808] transition-colors duration-300 ${focusMode ? 'bg-[#050505]' : ''}`}>

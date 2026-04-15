@@ -2,6 +2,9 @@ import axios from 'axios';
 import { store } from '../store';
 import { setCredentials, logout } from '../store/slices/authSlice';
 
+// Single source of truth — set VITE_API_BASE_URL in .env (local) or
+// your hosting dashboard (production). Falls back to relative /api/v1
+// only if the variable is missing entirely.
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 const api = axios.create({

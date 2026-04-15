@@ -127,6 +127,12 @@ body {
   -webkit-backdrop-filter: blur(24px) saturate(200%);
   border: 1px solid rgba(255,255,255,0.07);
 }
+.glass-strong {
+  background: rgba(14,14,14,0.92);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255,255,255,0.09);
+}
 
 /* ── Navbar ────────────────────────────────────────────────────────────────── */
 .navbar-blur {
@@ -163,6 +169,14 @@ body {
   border-radius: 0 3px 3px 0;
 }
 
+/* ── Mobile drawer swipe hint ──────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .nav-active::before {
+    width: 3px;
+    height: 60%;
+  }
+}
+
 /* ── Hero gradient ─────────────────────────────────────────────────────────── */
 .hero-gradient {
   background: linear-gradient(to right, rgba(10,10,10,0.95) 30%, rgba(10,10,10,0.6) 60%, transparent 100%),
@@ -186,6 +200,18 @@ body {
   background: radial-gradient(ellipse at 20% 50%, rgba(229,9,20,0.07) 0%, transparent 55%),
               radial-gradient(ellipse at 80% 20%, rgba(62,166,255,0.04) 0%, transparent 50%),
               #0a0a0a;
+}
+/* alias used in AuthLayout */
+.auth-gradient {
+  background: radial-gradient(ellipse at 15% 60%, rgba(229,9,20,0.06) 0%, transparent 50%),
+              radial-gradient(ellipse at 85% 15%, rgba(62,166,255,0.04) 0%, transparent 45%),
+              radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.01) 0%, transparent 60%),
+              #080808;
+}
+
+/* ── Card hover ring ───────────────────────────────────────────────────────── */
+.card-hover-ring:hover {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 32px rgba(0,0,0,0.6);
 }
 
 /* ── Input ─────────────────────────────────────────────────────────────────── */

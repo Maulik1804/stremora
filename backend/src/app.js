@@ -29,7 +29,9 @@ app.use(
       if (!origin) return callback(null, true);
       // Allow any localhost port (covers any dev machine)
       if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
-      // Allow explicitly listed origins from env
+      // Allow any Cloudflare tunnel URL — so you never need to update backend when tunnel restarts
+      if (/^https:\/\/[^.]+\.trycloudflare\.com$/.test(origin)) return callback(null, true);
+      // Allow explicitly listed origins from env (production domains)
       if (CORS_ORIGIN.includes(origin)) return callback(null, true);
       callback(new Error(`CORS: origin '${origin}' not allowed`));
     },

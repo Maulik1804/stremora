@@ -3,16 +3,7 @@
   command = "npm run build"
   publish = "dist"
 
-# ── API proxy — forwards /api/* to your Cloudflare tunnel ────────────────────
-# Update BACKEND_URL in Netlify Environment Variables when your tunnel URL changes
-# This means VITE_API_BASE_URL=/api/v1 works in BOTH local dev and production
-[[redirects]]
-  from = "/api/*"
-  to = "https://timber-alot-potatoes-tiny.trycloudflare.com/api/:splat"
-  status = 200
-  force = true
-
-# ── SPA routing — must come LAST ─────────────────────────────────────────────
+# SPA routing — redirects all routes to index.html for React Router
 [[redirects]]
   from = "/*"
   to = "/index.html"

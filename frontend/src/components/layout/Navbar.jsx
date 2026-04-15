@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useSidebar } from '../../hooks/useSidebar';
 import { useSearchSuggestions } from '../../hooks/useSearchSuggestions';
+import { useWindowWidth } from '../../hooks/useWindowWidth';
 import Avatar from '../ui/Avatar';
 import SurpriseButton from '../features/SurpriseButton';
 import { formatCount } from '../../utils/format';
+
 
 // ── Recent searches (localStorage) ───────────────────────────────────────────
 const RECENT_KEY = 'streamora_recent_searches';
@@ -249,7 +251,9 @@ const Logo = () => (
 // ── Navbar ────────────────────────────────────────────────────────────────────
 const Navbar = () => {
   const { user, isAuthenticated } = useAuth();
-  const { toggle } = useSidebar();
+  const { toggle, toggleMobile, mobileOpen } = useSidebar();
+  const windowWidth = useWindowWidth();
+  const handleMenuClick = () => windowWidth < 768 ? toggleMobile() : toggle();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -272,7 +276,7 @@ const Navbar = () => {
       {/* Left */}
       <div className="flex items-center gap-3 flex-shrink-0">
         <motion.button
-          onClick={toggle}
+          onClick={handleMenuClick}
           whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
           className="p-2 rounded-xl hover:bg-white/6 transition-colors"
           aria-label="Toggle sidebar"
