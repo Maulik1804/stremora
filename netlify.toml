@@ -3,7 +3,15 @@
   command = "npm run build"
   publish = "dist"
 
-# SPA routing — redirects all routes to index.html for React Router
+# ── API proxy — forwards /api/* to the Cloudflare tunnel ─────────────────────
+# When the tunnel URL changes, update ONLY this line.
+[[redirects]]
+  from = "/api/*"
+  to = "https://tuning-playlist-lawrence-oliver.trycloudflare.com/api/:splat"
+  status = 200
+  force = true
+
+# ── SPA routing — all other routes go to index.html for React Router ─────────
 [[redirects]]
   from = "/*"
   to = "/index.html"

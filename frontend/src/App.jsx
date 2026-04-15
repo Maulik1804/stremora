@@ -33,7 +33,10 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Studio = lazy(() => import('./pages/Studio'));
 const Upload = lazy(() => import('./pages/Upload'));
+const EditVideo = lazy(() => import('./pages/EditVideo'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Series = lazy(() => import('./pages/Series'));
+const ChannelPlaylistDetail = lazy(() => import('./pages/ChannelPlaylistDetail'));
 
 const PageLoader = () => (
   <div className="flex justify-center items-center min-h-[60vh]">
@@ -69,6 +72,8 @@ const App = () => {
           <Route path="/watch/:id" element={<Watch />} />
           <Route path="/search" element={<Search />} />
           <Route path="/channel/:username" element={<Channel />} />
+          {/* Channel playlists — public, no login required */}
+          <Route path="/channel-playlist/:id" element={<ChannelPlaylistDetail />} />
           <Route path="/trending" element={<Trending />} />
           <Route path="/explore" element={<Explore />} />
           <Route path="/category/:slug" element={<Category />} />
@@ -117,6 +122,14 @@ const App = () => {
           <Route
             path="/upload"
             element={<ProtectedRoute><Upload /></ProtectedRoute>}
+          />
+          <Route
+            path="/studio/edit/:id"
+            element={<ProtectedRoute><EditVideo /></ProtectedRoute>}
+          />
+          <Route
+            path="/series"
+            element={<ProtectedRoute><Series /></ProtectedRoute>}
           />
 
           <Route path="*" element={<NotFound />} />

@@ -4,13 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell, BellOff, Edit2, Users, PlaySquare, Info,
-  Calendar, CheckCircle2, Upload, MoreHorizontal,
+  Calendar, CheckCircle2, Upload, Film,
 } from 'lucide-react';
 import { userService } from '../services/user.service';
 import { videoService } from '../services/video.service';
+import { engagementService } from '../services/engagement.service';
 import api from '../services/api';
 import Avatar from '../components/ui/Avatar';
 import VideoGrid from '../components/video/VideoGrid';
+import SeriesCard from '../components/series/SeriesCard';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
 import { formatCount } from '../utils/format';
@@ -18,8 +20,9 @@ import { useAuth } from '../hooks/useAuth';
 import { toast } from '../components/ui/Toast';
 
 const TABS = [
-  { id: 'videos', label: 'Videos', icon: PlaySquare },
-  { id: 'about',  label: 'About',  icon: Info },
+  { id: 'videos',    label: 'Videos',    icon: PlaySquare },
+  { id: 'playlists', label: 'Playlists', icon: Film },
+  { id: 'about',     label: 'About',     icon: Info },
 ];
 
 // ── Utility: deterministic color from string ──────────────────────────────────
@@ -100,8 +103,15 @@ const Channel = () => {
   // ── Fetch channel videos ──────────────────────────────────────────────────
   const { data: videosData, isLoading: videosLoading } = useQuery({
     queryKey: ['channel-videos', channel?._id],
-    queryFn: () => videoService.getFeed().then((r) => r.data.data),
+    queryFn: () => videoService.getChannelVideos(channel._id).then((r) => r.data.data),
     enabled: !!channel?._id && activeTab === 'videos',
+  });
+
+  // ── Fetch channel series ──────────────────────────────────────────────────
+  const { data: seriesData, isLoading: seriesLoading } = useQuery({
+    queryKey: ['channel-series', channel?._id],
+    queryFn: () => engagementService.getChannelSeries(channel._id).then((r) => r.data.data.series),
+    enabled: !!channel?._id && activeTab === 'playlists',
   });
 
   // ── Subscribe ─────────────────────────────────────────────────────────────
@@ -137,6 +147,7 @@ const Channel = () => {
   }
 
   const videos = videosData?.videos ?? [];
+  const seriesList = seriesData ?? [];
   const joinDate = channel.createdAt
     ? new Date(channel.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
     : null;
@@ -322,10 +333,6 @@ const Channel = () => {
                     ? <><BellOff size={14} />Subscribed</>
                     : <><Bell size={14} />Subscribe</>}
                 </Button>
-                {/* More options */}
-                <button className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/8 hover:border-white/15 flex items-center justify-center text-[#666] hover:text-[#aaa] transition-all duration-200">
-                  <MoreHorizontal size={16} />
-                </button>
               </>
             ) : (
               <Link to="/login">
@@ -450,6 +457,52 @@ const Channel = () => {
                       </Link>
                     )}
                   </motion.div>
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'playlists' && (
+              <motion.div
+                key="playlists"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+              >
+                {seriesLoading ? (
+                  <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+                ) : seriesList.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col items-center gap-5 py-28 text-center"
+                  >
+                    <div className="w-20 h-20 rounded-3xl bg-[#0f0f0f] border border-white/6 flex items-center justify-center">
+                      <Film size={32} className="text-[#2a2a2a]" />
+                    </div>
+                    <div>
+                      <p className="text-[#e0e0e0] font-semibold text-lg">No playlists yet</p>
+                      <p className="text-sm text-[#444] mt-1.5">
+                        {isOwner
+                          ? 'Create a playlist to group your videos and show them on your channel.'
+                          : "This channel hasn't created any playlists yet."}
+                      </p>
+                    </div>
+                    {/* Only the channel owner can create playlists */}
+                    {isOwner && (
+                      <Link to="/series">
+                        <Button variant="primary" size="md">
+                          <Film size={15} />Create a Playlist
+                        </Button>
+                      </Link>
+                    )}
+                  </motion.div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {seriesList.map((s) => (
+                      <SeriesCard key={s._id} series={s} />
+                    ))}
+                  </div>
                 )}
               </motion.div>
             )}

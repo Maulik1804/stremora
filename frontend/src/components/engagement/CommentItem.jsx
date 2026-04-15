@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThumbsUp, Trash2, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { formatDistanceToNow } from '../../utils/date';
 import { formatCount } from '../../utils/format';
 import { engagementService } from '../../services/engagement.service';
 import { useAuth } from '../../hooks/useAuth';
+import { toast } from '../ui/Toast';
 
 const CommentItem = ({ comment, videoId, depth = 0 }) => {
   const { user, isAuthenticated } = useAuth();
@@ -15,9 +16,34 @@ const CommentItem = ({ comment, videoId, depth = 0 }) => {
   const [showReplies, setShowReplies] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(comment.likeCount ?? 0);
 
   const isOwn = user?._id === comment.author?._id;
   const isDeleted = comment.isDeleted;
+
+  // ── Fetch user's comment reaction ─────────────────────────────────────────
+  const { data: userCommentReaction } = useQuery({
+    queryKey: ['comment-reaction', comment._id, isAuthenticated],
+    queryFn: async () => {
+      if (!isAuthenticated) return null;
+      try {
+        const res = await engagementService.getCommentReaction(comment._id);
+        return res.data.data.reactionState || null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: isAuthenticated && !!comment._id,
+  });
+
+  // Sync liked state when user reaction data loads
+  useEffect(() => {
+    if (isAuthenticated && userCommentReaction !== undefined) {
+      setLiked(userCommentReaction === 'like');
+    } else if (!isAuthenticated) {
+      setLiked(false);
+    }
+  }, [userCommentReaction, isAuthenticated]);
 
   // ── Fetch replies ─────────────────────────────────────────────────────────
   const { data: repliesData, isLoading: repliesLoading } = useQuery({
@@ -47,7 +73,34 @@ const CommentItem = ({ comment, videoId, depth = 0 }) => {
   // ── Like comment ──────────────────────────────────────────────────────────
   const likeMutation = useMutation({
     mutationFn: () => engagementService.likeComment(comment._id, 'like'),
-    onSuccess: () => setLiked((v) => !v),
+    onMutate: async () => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['comment-reaction', comment._id, isAuthenticated] });
+
+      // Snapshot the previous values
+      const previousLiked = liked;
+      const previousLikeCount = likeCount;
+
+      // Optimistically update
+      const newLiked = !liked;
+      const newLikeCount = newLiked ? likeCount + 1 : Math.max(0, likeCount - 1);
+      
+      setLiked(newLiked);
+      setLikeCount(newLikeCount);
+      queryClient.setQueryData(['comment-reaction', comment._id, isAuthenticated], newLiked ? 'like' : null);
+
+      return { previousLiked, previousLikeCount };
+    },
+    onSuccess: () => {
+      // Keep the optimistic update
+    },
+    onError: (err, variables, context) => {
+      // Revert on error
+      setLiked(context?.previousLiked ?? false);
+      setLikeCount(context?.previousLikeCount ?? 0);
+      queryClient.setQueryData(['comment-reaction', comment._id, isAuthenticated], context?.previousLiked ? 'like' : null);
+      toast.error('Failed to like comment');
+    },
   });
 
   const replies = repliesData?.replies ?? [];
@@ -87,19 +140,25 @@ const CommentItem = ({ comment, videoId, depth = 0 }) => {
           <div className="flex items-center gap-3 mt-2">
             {/* Like */}
             <button
-              onClick={() => isAuthenticated && likeMutation.mutate()}
+              onClick={() => {
+                if (!isAuthenticated) { toast.warning('Sign in to like comments'); return; }
+                likeMutation.mutate();
+              }}
               className={`flex items-center gap-1 text-xs transition-colors
                 ${liked ? 'text-[#3ea6ff]' : 'text-[#aaaaaa] hover:text-[#f1f1f1]'}`}
               aria-label="Like comment"
             >
               <ThumbsUp size={13} className={liked ? 'fill-current' : ''} />
-              {formatCount((comment.likeCount ?? 0) + (liked ? 1 : 0))}
+              {formatCount(likeCount)}
             </button>
 
             {/* Reply (only on top-level) */}
-            {depth === 0 && isAuthenticated && (
+            {depth === 0 && (
               <button
-                onClick={() => setShowReplyBox((v) => !v)}
+                onClick={() => {
+                  if (!isAuthenticated) { toast.warning('Sign in to reply to comments'); return; }
+                  setShowReplyBox((v) => !v);
+                }}
                 className="text-xs text-[#aaaaaa] hover:text-[#f1f1f1] transition-colors"
               >
                 Reply

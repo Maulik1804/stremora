@@ -55,10 +55,12 @@ const getPlaylist = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/v1/playlists/me
- * Get all playlists owned by the authenticated user. Requires: verifyJWT
+ * Get personal playlists (NOT channel playlists) owned by the authenticated user.
+ * isSeries playlists belong to the channel section — excluded here.
+ * Requires: verifyJWT
  */
 const getMyPlaylists = asyncHandler(async (req, res) => {
-  const playlists = await Playlist.find({ owner: req.user._id })
+  const playlists = await Playlist.find({ owner: req.user._id, isSeries: { $ne: true } })
     .sort({ createdAt: -1 })
     .select('title description visibility videos isWatchLater collaborators createdAt')
     .lean();
@@ -248,6 +250,84 @@ const reorderPlaylist = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, { playlist }, 'Playlist reordered'));
 });
 
+/**
+ * POST /api/v1/playlists/series
+ * Create a new series playlist. Requires: verifyJWT
+ */
+const createSeries = asyncHandler(async (req, res) => {
+  const { title, description = '', visibility = 'public' } = req.body;
+  if (!title) throw new ApiError(400, 'Title is required');
+
+  const series = await Playlist.create({
+    owner: req.user._id,
+    title,
+    description,
+    visibility,
+    isSeries: true,
+  });
+
+  return res.status(201).json(new ApiResponse(201, { playlist: series }, 'Series created'));
+});
+
+/**
+ * GET /api/v1/playlists/series/me
+ * Get all series owned by the authenticated user. Requires: verifyJWT
+ */
+const getMySeries = asyncHandler(async (req, res) => {
+  const series = await Playlist.find({ owner: req.user._id, isSeries: true })
+    .sort({ createdAt: -1 })
+    .select('title description visibility videos isSeries seriesThumbnail createdAt updatedAt')
+    .lean();
+
+  return res.status(200).json(new ApiResponse(200, { series }));
+});
+
+/**
+ * GET /api/v1/playlists/series/channel/:userId
+ * Get all public channel playlists for a channel (by userId). Public endpoint.
+ */
+const getChannelSeries = asyncHandler(async (req, res) => {
+  const series = await Playlist.find({
+    owner: req.params.userId,
+    isSeries: true,
+    visibility: 'public',
+  })
+    .sort({ createdAt: -1 })
+    .populate('owner', 'username displayName avatar')
+    .populate({
+      path: 'videos',
+      match: { isDeleted: false, status: 'published' },
+      select: 'title thumbnailUrl duration viewCount createdAt',
+    })
+    .lean();
+
+  // Auto-set seriesThumbnail from first video if not explicitly set
+  const enriched = series.map((s) => ({
+    ...s,
+    seriesThumbnail: s.seriesThumbnail || s.videos?.[0]?.thumbnailUrl || '',
+    episodeCount: s.videos?.length ?? 0,
+  }));
+
+  return res.status(200).json(new ApiResponse(200, { series: enriched }));
+});
+
+/**
+ * PATCH /api/v1/playlists/:id/series-thumbnail
+ * Update the series thumbnail. Owner only. Requires: verifyJWT
+ * Body: { thumbnailUrl } — use first episode's thumbnail or custom URL
+ */
+const updateSeriesThumbnail = asyncHandler(async (req, res) => {
+  const playlist = await Playlist.findOne({ _id: req.params.id, isSeries: true });
+  if (!playlist) throw new ApiError(404, 'Series not found');
+  if (!playlist.owner.equals(req.user._id)) throw new ApiError(403, 'Forbidden');
+
+  const { thumbnailUrl } = req.body;
+  playlist.seriesThumbnail = thumbnailUrl || '';
+  await playlist.save();
+
+  return res.status(200).json(new ApiResponse(200, { playlist }, 'Series thumbnail updated'));
+});
+
 module.exports = {
   createPlaylist,
   getPlaylist,
@@ -261,4 +341,8 @@ module.exports = {
   removeCollaborator,
   getCollaborators,
   getCollaborativePlaylists,
+  createSeries,
+  getMySeries,
+  getChannelSeries,
+  updateSeriesThumbnail,
 };

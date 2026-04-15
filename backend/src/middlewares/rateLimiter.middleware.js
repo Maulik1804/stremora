@@ -8,6 +8,12 @@ const globalRateLimiter = rateLimit({
   max: RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Never rate-limit token refresh — it's called automatically by the app
+    // req.path at the app level includes the full path
+    if (req.path.endsWith('/auth/refresh')) return true;
+    return false;
+  },
   message: {
     success: false,
     message: 'Too many requests, please try again later.',

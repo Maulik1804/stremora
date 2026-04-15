@@ -81,21 +81,58 @@ const uploadVideo = async (filePath, { folder = FOLDERS.VIDEO, onProgress } = {}
     pathToUpload = outputPath;
     wasConverted = converted;
 
-    const result = await uploadWithProgress(
-      pathToUpload,
-      {
-        resource_type: 'video',
-        folder,
-        eager: [
-          {
-            format: 'jpg',
-            transformation: [{ start_offset: '0', quality: 'auto' }],
-          },
-        ],
-        eager_async: false,
-      },
-      onProgress
-    );
+    console.log(`[Cloudinary] Uploading video: ${pathToUpload}`);
+
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'video',
+          folder,
+          eager: [
+            {
+              format: 'jpg',
+              transformation: [{ start_offset: '0', quality: 'auto' }],
+            },
+          ],
+          eager_async: false,
+          timeout: 600000, // 10 minutes timeout
+        },
+        (error, result) => {
+          if (error) {
+            console.error('[Cloudinary] Upload stream error:', error.message);
+            return reject(error);
+          }
+          console.log('[Cloudinary] Upload completed successfully');
+          resolve(result);
+        }
+      );
+
+      uploadStream.on('error', (err) => {
+        console.error('[Cloudinary] Stream error:', err.message);
+        reject(err);
+      });
+
+      uploadStream.on('abort', () => {
+        console.error('[Cloudinary] Upload aborted');
+        reject(new Error('Upload aborted'));
+      });
+
+      if (onProgress) {
+        uploadStream.on('progress', ({ percent }) => {
+          onProgress(Math.round(percent || 0));
+        });
+      }
+
+      const fileStream = fs.createReadStream(pathToUpload, { highWaterMark: 1024 * 1024 });
+      
+      fileStream.on('error', (err) => {
+        console.error('[Cloudinary] File read error:', err.message);
+        uploadStream.destroy();
+        reject(err);
+      });
+
+      fileStream.pipe(uploadStream);
+    });
 
     const thumbnailUrl =
       result.eager?.[0]?.secure_url ||
@@ -105,6 +142,8 @@ const uploadVideo = async (filePath, { folder = FOLDERS.VIDEO, onProgress } = {}
         transformation: [{ start_offset: '0', quality: 'auto' }],
         secure: true,
       });
+
+    console.log(`[Cloudinary] Video uploaded: ${result.public_id} (${(result.bytes / 1024 / 1024).toFixed(2)} MB)`);
 
     return {
       url: result.secure_url,

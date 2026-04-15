@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, Save, Lock, User, Shield, Palette } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDispatch } from 'react-redux';
@@ -12,6 +12,7 @@ import { useAuth } from '../hooks/useAuth';
 import Avatar from '../components/ui/Avatar';
 import FormField from '../components/ui/FormField';
 import Button from '../components/ui/Button';
+import ImageCropper from '../components/ui/ImageCropper';
 import { toast } from '../components/ui/Toast';
 
 const profileSchema = z.object({
@@ -68,6 +69,10 @@ const Settings = () => {
   const queryClient = useQueryClient();
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [bannerPreview, setBannerPreview] = useState(null);
+  const [showAvatarCropper, setShowAvatarCropper] = useState(false);
+  const [showBannerCropper, setShowBannerCropper] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState(null);
+  const [cropType, setCropType] = useState(null); // 'avatar' or 'banner'
 
   const profileForm = useForm({
     resolver: zodResolver(profileSchema),
@@ -112,71 +117,142 @@ const Settings = () => {
     onError: () => toast.error('Banner upload failed'),
   });
 
+  const handleImageSelect = (file, type) => {
+    // Validate image
+    const validMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validMimes.includes(file.type)) {
+      toast.error('Invalid image type. Accepted: JPEG, PNG, WebP, GIF');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image exceeds 5 MB limit');
+      return;
+    }
+
+    // Show cropper
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImageToCrop(e.target.result);
+      setCropType(type);
+      if (type === 'avatar') {
+        setShowAvatarCropper(true);
+      } else {
+        setShowBannerCropper(true);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropComplete = (croppedBlob) => {
+    if (cropType === 'avatar') {
+      setShowAvatarCropper(false);
+      setAvatarPreview(URL.createObjectURL(croppedBlob));
+      avatarMutation.mutate(croppedBlob);
+    } else {
+      setShowBannerCropper(false);
+      setBannerPreview(URL.createObjectURL(croppedBlob));
+      bannerMutation.mutate(croppedBlob);
+    }
+    setImageToCrop(null);
+    setCropType(null);
+  };
+
   const bioValue = profileForm.watch('bio') ?? '';
 
   return (
-    <div className="min-h-screen px-4 md:px-8 py-8 max-w-2xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h1 className="text-2xl font-bold text-[#e8e8e8]">Settings</h1>
-        <p className="text-sm text-[#555] mt-1">Manage your account and channel</p>
-      </motion.div>
+    <>
+      <AnimatePresence>
+        {showAvatarCropper && imageToCrop && (
+          <ImageCropper
+            imageSrc={imageToCrop}
+            aspect={1 / 1}
+            title="Adjust Profile Photo"
+            onCropComplete={handleCropComplete}
+            onCancel={() => {
+              setShowAvatarCropper(false);
+              setImageToCrop(null);
+              setCropType(null);
+            }}
+          />
+        )}
+        {showBannerCropper && imageToCrop && (
+          <ImageCropper
+            imageSrc={imageToCrop}
+            aspect={16 / 9}
+            title="Adjust Banner"
+            onCropComplete={handleCropComplete}
+            onCancel={() => {
+              setShowBannerCropper(false);
+              setImageToCrop(null);
+              setCropType(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
-      <div className="flex flex-col gap-4">
-        {/* Channel art */}
-        <Section title="Channel art" icon={Palette} index={0}>
-          {/* Banner */}
-          <div className="mb-6">
-            <p className="text-xs font-medium text-[#666] uppercase tracking-widest mb-3">Banner</p>
-            <ImageUploadTrigger onSelect={(f) => { setBannerPreview(URL.createObjectURL(f)); bannerMutation.mutate(f); }}>
-              <div className="relative h-28 rounded-2xl overflow-hidden bg-[#111] border border-white/6 group cursor-pointer">
-                {(bannerPreview || user?.banner) ? (
-                  <img src={bannerPreview || user.banner} alt="Banner" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full"
-                    style={{ background: 'radial-gradient(ellipse at 30% 50%, rgba(229,9,20,0.08) 0%, transparent 60%), #111' }} />
-                )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                  <Camera size={16} className="text-white" />
-                  <span className="text-white text-sm font-medium">Change banner</span>
-                </div>
-                {bannerMutation.isPending && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  </div>
-                )}
-              </div>
-            </ImageUploadTrigger>
-          </div>
+      <div className="min-h-screen px-4 md:px-8 py-8 max-w-2xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <h1 className="text-2xl font-bold text-[#e8e8e8]">Settings</h1>
+          <p className="text-sm text-[#555] mt-1">Manage your account and channel</p>
+        </motion.div>
 
-          {/* Avatar */}
-          <div>
-            <p className="text-xs font-medium text-[#666] uppercase tracking-widest mb-3">Profile photo</p>
-            <div className="flex items-center gap-5">
-              <ImageUploadTrigger onSelect={(f) => { setAvatarPreview(URL.createObjectURL(f)); avatarMutation.mutate(f); }}>
-                <div className="relative group cursor-pointer">
-                  <Avatar src={avatarPreview || user?.avatar} alt={user?.displayName || ''} size="xl" className="w-20 h-20" />
-                  <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/55 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <Camera size={18} className="text-white" />
+        <div className="flex flex-col gap-4">
+          {/* Channel art */}
+          <Section title="Channel art" icon={Palette} index={0}>
+            {/* Banner */}
+            <div className="mb-6">
+              <p className="text-xs font-medium text-[#666] uppercase tracking-widest mb-3">Banner</p>
+              <ImageUploadTrigger onSelect={(f) => handleImageSelect(f, 'banner')}>
+                <div className="relative h-28 rounded-2xl overflow-hidden bg-[#111] border border-white/6 group cursor-pointer">
+                  {(bannerPreview || user?.banner) ? (
+                    <img src={bannerPreview || user.banner} alt="Banner" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full"
+                      style={{ background: 'radial-gradient(ellipse at 30% 50%, rgba(229,9,20,0.08) 0%, transparent 60%), #111' }} />
+                  )}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                    <Camera size={16} className="text-white" />
+                    <span className="text-white text-sm font-medium">Change banner</span>
                   </div>
-                  {avatarMutation.isPending && (
-                    <div className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center">
-                      <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  {bannerMutation.isPending && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                     </div>
                   )}
                 </div>
               </ImageUploadTrigger>
-              <div>
-                <p className="text-sm font-semibold text-[#e0e0e0]">{user?.displayName}</p>
-                <p className="text-xs text-[#555] mt-0.5">@{user?.username}</p>
-                <p className="text-xs text-[#444] mt-2">Click photo to change</p>
+            </div>
+
+            {/* Avatar */}
+            <div>
+              <p className="text-xs font-medium text-[#666] uppercase tracking-widest mb-3">Profile photo</p>
+              <div className="flex items-center gap-5">
+                <ImageUploadTrigger onSelect={(f) => handleImageSelect(f, 'avatar')}>
+                  <div className="relative group cursor-pointer">
+                    <Avatar src={avatarPreview || user?.avatar} alt={user?.displayName || ''} size="xl" className="w-20 h-20" />
+                    <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/55 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <Camera size={18} className="text-white" />
+                    </div>
+                    {avatarMutation.isPending && (
+                      <div className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center">
+                        <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                </ImageUploadTrigger>
+                <div>
+                  <p className="text-sm font-semibold text-[#e0e0e0]">{user?.displayName}</p>
+                  <p className="text-xs text-[#555] mt-0.5">@{user?.username}</p>
+                  <p className="text-xs text-[#444] mt-2">Click photo to change</p>
+                </div>
               </div>
             </div>
-          </div>
-        </Section>
+          </Section>
 
         {/* Profile info */}
         <Section title="Profile information" icon={User} index={1}>
@@ -240,6 +316,7 @@ const Settings = () => {
         </Section>
       </div>
     </div>
+    </>
   );
 };
 

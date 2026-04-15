@@ -43,6 +43,19 @@ const playlistSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+
+    // ── Series ────────────────────────────────────────────────────────────────
+    // When isSeries=true this playlist is a creator-managed series (like a TV show).
+    // seriesThumbnail is auto-set to the first episode's thumbnail but can be overridden.
+    isSeries: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    seriesThumbnail: {
+      type: String,
+      default: '',
+    },
   },
   { timestamps: true }
 );

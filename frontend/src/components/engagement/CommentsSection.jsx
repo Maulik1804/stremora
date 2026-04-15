@@ -8,6 +8,7 @@ import Spinner from '../ui/Spinner';
 import { engagementService } from '../../services/engagement.service';
 import { useAuth } from '../../hooks/useAuth';
 import { formatCount } from '../../utils/format';
+import { toast } from '../ui/Toast';
 
 const SORT_OPTIONS = [
   { value: 'date',  label: 'Top comments' },
@@ -53,6 +54,10 @@ const CommentsSection = ({ videoId, commentCount = 0 }) => {
       setText('');
       setFocused(false);
       queryClient.invalidateQueries({ queryKey: ['comments', videoId] });
+      toast.success('Comment posted');
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to post comment');
     },
   });
 

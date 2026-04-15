@@ -12,8 +12,13 @@ const {
   searchVideos,
   updateVideo,
   deleteVideo,
+  getMyVideos,
+  getChannelVideos,
   getSubscriptionFeed,
   recordView,
+  initChunkedUpload,
+  uploadChunk,
+  finalizeChunkedUpload,
 } = require('../controllers/video.controller');
 
 const verifyJWT = require('../middlewares/auth.middleware');
@@ -33,6 +38,22 @@ router.get('/search', [
 
 // Authenticated static routes (before /:id)
 router.get('/subscriptions/feed', verifyJWT, getSubscriptionFeed);
+
+// Creator-only: own videos (Studio / Dashboard)
+router.get('/mine', verifyJWT, getMyVideos);
+
+// Public: all videos for a specific channel
+router.get('/channel/:userId', getChannelVideos);
+
+// Chunked upload routes
+router.post('/upload/init', verifyJWT, [
+  body('title').trim().notEmpty().withMessage('Title is required').isLength({ max: 100 }).withMessage('Title max 100 chars'),
+  body('fileSize').isInt({ min: 1 }).withMessage('fileSize must be a positive integer'),
+], validate, initChunkedUpload);
+
+router.post('/upload/:uploadSessionId/chunk', verifyJWT, uploadVideo.single('chunk'), handleUploadError, uploadChunk);
+
+router.post('/upload/:uploadSessionId/finalize', verifyJWT, finalizeChunkedUpload);
 
 // Upload (POST /)
 router.post(

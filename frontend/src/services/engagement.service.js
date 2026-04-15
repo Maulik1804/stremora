@@ -4,6 +4,12 @@ export const engagementService = {
   // Likes
   toggleReaction: (resourceType, resourceId, reaction) =>
     api.post('/likes', { resourceType, resourceId, reaction }),
+  
+  getVideoReaction: (videoId) =>
+    api.get(`/likes/video/${videoId}`),
+
+  getCommentReaction: (commentId) =>
+    api.get(`/likes/comment/${commentId}`),
 
   // Comments
   getComments:  (videoId, cursor, sort = 'date') =>
@@ -30,6 +36,15 @@ export const engagementService = {
   addCollaborator:      (id, usernameOrEmail) => api.post(`/playlists/${id}/collaborators`, { usernameOrEmail }),
   removeCollaborator:   (id, userId)    => api.delete(`/playlists/${id}/collaborators/${userId}`),
   getCollaborators:     (id)            => api.get(`/playlists/${id}/collaborators`),
+
+  // Series (creator-managed episode playlists)
+  createSeries:         (data)          => api.post('/playlists/series', data),
+  getMySeries:          ()              => api.get('/playlists/series/me'),
+  getChannelSeries:     (userId)        => api.get(`/playlists/series/channel/${userId}`),
+  updateSeriesThumbnail:(id, thumbnailUrl) => api.patch(`/playlists/${id}/series-thumbnail`, { thumbnailUrl }),
+  addToSeries:          (id, videoId)   => api.post(`/playlists/${id}/videos`, { videoId }),
+  removeFromSeries:     (id, videoId)   => api.delete(`/playlists/${id}/videos/${videoId}`),
+  reorderSeries:        (id, videoId, newIndex) => api.patch(`/playlists/${id}/reorder`, { videoId, newIndex }),
 
   // History
   getHistory:         (cursor) => api.get('/history', { params: { cursor } }),

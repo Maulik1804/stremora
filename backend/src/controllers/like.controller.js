@@ -95,6 +95,46 @@ const toggleReaction = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /api/v1/likes/video/:videoId
+ * Get the authenticated user's reaction (like/dislike/none) for a specific video. Requires: verifyJWT
+ */
+const getVideoReaction = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+
+  const like = await Like.findOne({
+    user: req.user._id,
+    resourceType: 'video',
+    resourceId: videoId,
+  }).lean();
+
+  const reactionState = like?.reaction || null;
+
+  return res.status(200).json(
+    new ApiResponse(200, { reactionState })
+  );
+});
+
+/**
+ * GET /api/v1/likes/comment/:commentId
+ * Get the authenticated user's reaction (like/none) for a specific comment. Requires: verifyJWT
+ */
+const getCommentReaction = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+
+  const like = await Like.findOne({
+    user: req.user._id,
+    resourceType: 'comment',
+    resourceId: commentId,
+  }).lean();
+
+  const reactionState = like?.reaction || null;
+
+  return res.status(200).json(
+    new ApiResponse(200, { reactionState })
+  );
+});
+
+/**
  * GET /api/v1/likes/me/videos
  * Get the authenticated user's liked videos. Requires: verifyJWT
  */
@@ -132,4 +172,4 @@ const getLikedVideos = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, { videos: orderedVideos, nextCursor, hasMore }));
 });
 
-module.exports = { toggleReaction, getLikedVideos };
+module.exports = { toggleReaction, getVideoReaction, getCommentReaction, getLikedVideos };

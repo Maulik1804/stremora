@@ -46,6 +46,14 @@ app.use(compression());
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
+// ── Increase request timeout for large file uploads ───────────────────────────
+// Set to 10 minutes for large video uploads
+app.use((req, res, next) => {
+  req.setTimeout(10 * 60 * 1000); // 10 minutes
+  res.setTimeout(10 * 60 * 1000); // 10 minutes
+  next();
+});
+
 // ── Cookie parser ─────────────────────────────────────────────────────────────
 app.use(cookieParser());
 

@@ -14,8 +14,6 @@ import ShareModal from '../components/engagement/ShareModal';
 import SaveToPlaylistModal from '../components/engagement/SaveToPlaylistModal';
 import TimestampComments from '../components/features/TimestampComments';
 import PinnedComment from '../components/features/PinnedComment';
-import SearchInsideVideo from '../components/features/SearchInsideVideo';
-import VideoThemeToggle from '../components/features/VideoThemeToggle';
 import FocusModeToggle from '../components/features/FocusModeToggle';
 import Avatar from '../components/ui/Avatar';
 import Spinner from '../components/ui/Spinner';
@@ -30,7 +28,6 @@ import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useXP } from '../hooks/useXP';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectVideoTheme, THEMES } from '../store/slices/themeSlice';
 import { selectFocusMode, setFocusMode } from '../store/slices/focusSlice';
 
 const WATCH_THRESHOLD_SECONDS = 30;
@@ -41,7 +38,6 @@ const Watch = () => {
   const { award } = useXP();
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
-  const videoTheme = useSelector(selectVideoTheme);
   const focusMode = useSelector(selectFocusMode);
 
   const [descExpanded, setDescExpanded] = useState(false);
@@ -66,6 +62,30 @@ const Watch = () => {
   useEffect(() => {
     if (video?.owner) setSubscribed(video.owner.isSubscribed ?? false);
   }, [video?.owner?._id, video?.owner?.isSubscribed]);
+
+  // ── Fetch user's reaction (like/dislike) for this video ──────────────────
+  const { data: userReaction } = useQuery({
+    queryKey: ['video-reaction', id, isAuthenticated],
+    queryFn: async () => {
+      if (!isAuthenticated) return null;
+      try {
+        const res = await engagementService.getVideoReaction(id);
+        return res.data.data.reactionState || null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: isAuthenticated && !!id,
+  });
+
+  // Sync reaction state when user reaction data loads
+  useEffect(() => {
+    if (isAuthenticated && userReaction !== undefined) {
+      setReaction(userReaction);
+    } else if (!isAuthenticated) {
+      setReaction(null);
+    }
+  }, [userReaction, isAuthenticated]);
 
   // ── Record view + history ─────────────────────────────────────────────────
   const handleTimeUpdate = (currentTime) => {
@@ -99,7 +119,8 @@ const Watch = () => {
 
     // Feature 15: double-tap center → like
     const handleDoubleTapLike = () => {
-      if (isAuthenticated) likeMutation.mutate('like');
+      if (!isAuthenticated) { toast.warning('Sign in to like videos'); return; }
+      likeMutation.mutate('like');
     };
     window.addEventListener('streamora:doubletap-like', handleDoubleTapLike);
 
@@ -112,11 +133,60 @@ const Watch = () => {
   // ── Like / dislike ────────────────────────────────────────────────────────
   const likeMutation = useMutation({
     mutationFn: (r) => engagementService.toggleReaction('video', id, r),
+    onMutate: async (newReaction) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['video-reaction', id, isAuthenticated] });
+      await queryClient.cancelQueries({ queryKey: ['video', id] });
+
+      // Snapshot the previous values
+      const previousReaction = queryClient.getQueryData(['video-reaction', id, isAuthenticated]);
+      const previousVideo = queryClient.getQueryData(['video', id]);
+
+      // Calculate optimistic reaction
+      let optimisticReaction = newReaction;
+      if (reaction === newReaction) {
+        // Toggle off
+        optimisticReaction = null;
+      }
+
+      // Update reaction state
+      setReaction(optimisticReaction);
+      queryClient.setQueryData(['video-reaction', id, isAuthenticated], optimisticReaction);
+
+      // Update video like/dislike counts optimistically
+      if (previousVideo) {
+        const updatedVideo = { ...previousVideo };
+        
+        // Remove old reaction count
+        if (reaction === 'like') {
+          updatedVideo.likeCount = Math.max(0, updatedVideo.likeCount - 1);
+        } else if (reaction === 'dislike') {
+          updatedVideo.dislikeCount = Math.max(0, updatedVideo.dislikeCount - 1);
+        }
+
+        // Add new reaction count
+        if (optimisticReaction === 'like') {
+          updatedVideo.likeCount = (updatedVideo.likeCount || 0) + 1;
+        } else if (optimisticReaction === 'dislike') {
+          updatedVideo.dislikeCount = (updatedVideo.dislikeCount || 0) + 1;
+        }
+
+        queryClient.setQueryData(['video', id], updatedVideo);
+      }
+
+      return { previousReaction, previousVideo };
+    },
     onSuccess: (res) => {
       setReaction(res.data.data.reactionState);
-      queryClient.invalidateQueries({ queryKey: ['video', id] });
+      // Don't invalidate, keep the optimistic update
     },
-    onError: () => toast.error('Sign in to like videos'),
+    onError: (err, newReaction, context) => {
+      // Revert on error
+      setReaction(context?.previousReaction ?? null);
+      queryClient.setQueryData(['video-reaction', id, isAuthenticated], context?.previousReaction);
+      queryClient.setQueryData(['video', id], context?.previousVideo);
+      toast.error('Failed to update reaction');
+    },
   });
 
   // ── Subscribe ─────────────────────────────────────────────────────────────
@@ -209,10 +279,7 @@ const Watch = () => {
       )}
 
 
-      <div className={`px-4 py-6 transition-colors duration-300 max-w-screen-xl mx-auto
-        ${videoTheme === THEMES.CINEMA ? 'bg-black' : ''}
-        ${videoTheme === THEMES.FOCUS ? 'max-w-4xl' : ''}`}
-      >
+      <div className="px-4 py-6 max-w-screen-xl mx-auto">
         <div className="flex flex-col xl:flex-row gap-6">
           {/* ── Left column ── */}
           <div className="flex-1 min-w-0">
@@ -278,7 +345,10 @@ const Watch = () => {
                 {/* Like/dislike pill */}
                 <div className="flex items-center bg-[#272727] rounded-full overflow-hidden">
                   <button
-                    onClick={() => isAuthenticated && likeMutation.mutate('like')}
+                    onClick={() => {
+                      if (!isAuthenticated) { toast.warning('Sign in to like videos'); return; }
+                      likeMutation.mutate('like');
+                    }}
                     className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors
                       ${reaction === 'like' ? 'text-[#3ea6ff]' : 'text-[#f1f1f1] hover:bg-[#3f3f3f]'}`}
                     aria-label="Like"
@@ -288,7 +358,10 @@ const Watch = () => {
                   </button>
                   <div className="w-px h-5 bg-[#3f3f3f]" />
                   <button
-                    onClick={() => isAuthenticated && likeMutation.mutate('dislike')}
+                    onClick={() => {
+                      if (!isAuthenticated) { toast.warning('Sign in to rate videos'); return; }
+                      likeMutation.mutate('dislike');
+                    }}
                     className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors
                       ${reaction === 'dislike' ? 'text-[#ff0000]' : 'text-[#f1f1f1] hover:bg-[#3f3f3f]'}`}
                     aria-label="Dislike"
@@ -304,7 +377,10 @@ const Watch = () => {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => isAuthenticated ? setShowSave(true) : null}
+                  onClick={() => {
+                    if (!isAuthenticated) { toast.warning('Sign in to save videos to playlists'); return; }
+                    setShowSave(true);
+                  }}
                 >
                   <BookmarkPlus size={15} /> Save
                 </Button>
@@ -319,9 +395,6 @@ const Watch = () => {
                   <Headphones size={15} />
                   {audioOnly ? 'Video' : 'Audio'}
                 </Button>
-
-                {/* Feature 13: Theme toggle */}
-                <VideoThemeToggle />
 
                 {/* Focus Mode toggle */}
                 <FocusModeToggle />
@@ -355,14 +428,6 @@ const Watch = () => {
               )}
             </div>
 
-
-            {/* Feature 14: Search inside video */}
-            <div className="mb-4">
-              <SearchInsideVideo
-                videoId={id}
-                onSeek={(ts) => window.dispatchEvent(new CustomEvent('streamora:seek', { detail: { time: ts } }))}
-              />
-            </div>
 
             {/* Feature 12: Pinned comment */}
             <PinnedComment

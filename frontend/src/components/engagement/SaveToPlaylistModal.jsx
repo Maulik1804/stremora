@@ -3,12 +3,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Check, Lock, Globe, Loader2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { engagementService } from '../../services/engagement.service';
+import { useAuth } from '../../hooks/useAuth';
+import { toast } from '../ui/Toast';
 
 const SaveToPlaylistModal = ({ videoId, onClose }) => {
+  const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [newTitle, setNewTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [saved, setSaved] = useState(new Set());
+
+  // Guard — should not be reachable without auth, but just in case
+  if (!isAuthenticated) {
+    toast.warning('Sign in to save videos to playlists');
+    onClose();
+    return null;
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-playlists'],
@@ -30,7 +40,9 @@ const SaveToPlaylistModal = ({ videoId, onClose }) => {
         return next;
       });
       queryClient.invalidateQueries({ queryKey: ['my-playlists'] });
+      toast.success(isIn ? 'Removed from playlist' : 'Saved to playlist');
     },
+    onError: () => toast.error('Failed to update playlist'),
   });
 
   const createMutation = useMutation({
@@ -39,11 +51,11 @@ const SaveToPlaylistModal = ({ videoId, onClose }) => {
     onSuccess: (res) => {
       const pl = res.data.data.playlist;
       queryClient.invalidateQueries({ queryKey: ['my-playlists'] });
-      // Auto-add the video to the new playlist
       toggleMutation.mutate({ playlistId: pl._id, isIn: false });
       setNewTitle('');
       setCreating(false);
     },
+    onError: () => toast.error('Failed to create playlist'),
   });
 
   return (

@@ -36,24 +36,30 @@ const CreateModal = ({ onClose, onCreated }) => {
       >
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-semibold text-[#f1f1f1]">New playlist</h3>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-[#272727] text-[#aaaaaa]"><X size={15} /></button>
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-[#272727] text-[#aaaaaa]">
+            <X size={15} />
+          </button>
         </div>
         <div className="flex flex-col gap-4">
           <input
             autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && title.trim() && mutation.mutate()}
             placeholder="Playlist name"
             maxLength={150}
-            className="w-full bg-[#0f0f0f] border border-[#3f3f3f] rounded-xl px-4 py-3 text-sm text-[#f1f1f1] outline-none focus:border-[#606060]"
+            className="w-full bg-[#0f0f0f] border border-[#3f3f3f] rounded-xl px-4 py-3 text-sm
+                       text-[#f1f1f1] outline-none focus:border-[#606060]"
           />
           <div className="flex gap-2">
             {['public', 'private'].map((v) => (
               <button
                 key={v}
                 onClick={() => setVisibility(v)}
-                className={`flex items-center gap-1.5 flex-1 py-2 rounded-xl text-sm font-medium border transition-colors
-                  ${visibility === v ? 'border-[#f1f1f1] bg-[#272727] text-[#f1f1f1]' : 'border-[#3f3f3f] text-[#aaaaaa] hover:border-[#606060]'}`}
+                className={`flex items-center justify-center gap-1.5 flex-1 py-2 rounded-xl text-sm font-medium border transition-colors
+                  ${visibility === v
+                    ? 'border-[#f1f1f1] bg-[#272727] text-[#f1f1f1]'
+                    : 'border-[#3f3f3f] text-[#aaaaaa] hover:border-[#606060]'}`}
               >
                 {v === 'private' ? <Lock size={13} /> : <Globe size={13} />}
                 {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -85,9 +91,10 @@ const PlaylistCard = ({ playlist, onDelete, showOwner = false }) => {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden hover:border-[#3f3f3f] transition-colors"
+      className="group relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden
+                 hover:border-[#3f3f3f] transition-colors"
     >
-      {/* Thumbnail stack */}
+      {/* Thumbnail */}
       <Link to={`/playlists/${playlist._id}`} className="block">
         <div className="relative aspect-video bg-[#272727]">
           {playlist.videos?.[0]?.thumbnailUrl ? (
@@ -103,13 +110,14 @@ const PlaylistCard = ({ playlist, onDelete, showOwner = false }) => {
                 : <ListVideo size={32} className="text-[#606060]" />}
             </div>
           )}
-          {/* Video count overlay */}
+          {/* Video count */}
           <div className="absolute bottom-0 right-0 bg-black/80 px-2 py-1 text-xs text-white font-medium">
-            {count} videos
+            {count} video{count !== 1 ? 's' : ''}
           </div>
           {/* Collaborative badge */}
-          {(playlist.collaborators?.length > 0) && (
-            <div className="absolute top-2 left-2 bg-[#3ea6ff]/20 border border-[#3ea6ff]/40 text-[#3ea6ff] text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+          {playlist.collaborators?.length > 0 && (
+            <div className="absolute top-2 left-2 bg-[#3ea6ff]/20 border border-[#3ea6ff]/40
+                            text-[#3ea6ff] text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
               <Users size={10} />
               Collab
             </div>
@@ -139,10 +147,12 @@ const PlaylistCard = ({ playlist, onDelete, showOwner = false }) => {
               <span className="text-xs text-[#606060] capitalize">{playlist.visibility}</span>
             </div>
           </div>
+          {/* Delete — only for own non-WatchLater playlists */}
           {!isWatchLater && !showOwner && (
             <button
               onClick={() => onDelete(playlist._id)}
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-900/30 text-[#606060] hover:text-red-400"
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg
+                         hover:bg-red-900/30 text-[#606060] hover:text-red-400"
               aria-label="Delete playlist"
             >
               <Trash2 size={14} />
@@ -160,11 +170,13 @@ const Playlists = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [tab, setTab] = useState('mine'); // 'mine' | 'collaborative'
 
+  // Personal playlists — isSeries playlists are excluded by the backend
   const { data, isLoading } = useQuery({
     queryKey: ['my-playlists'],
     queryFn: () => engagementService.getMyPlaylists().then((r) => r.data.data),
   });
 
+  // Playlists where the user is a collaborator
   const { data: collabData, isLoading: collabLoading } = useQuery({
     queryKey: ['collaborative-playlists'],
     queryFn: () => engagementService.getCollaborativePlaylists().then((r) => r.data.data),
@@ -175,9 +187,9 @@ const Playlists = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-playlists'] }),
   });
 
-  const playlists = data?.playlists ?? [];
+  const playlists     = data?.playlists ?? [];
   const collabPlaylists = collabData?.playlists ?? [];
-  const activeList = tab === 'mine' ? playlists : collabPlaylists;
+  const activeList    = tab === 'mine' ? playlists : collabPlaylists;
   const activeLoading = tab === 'mine' ? isLoading : collabLoading;
 
   return (
@@ -198,7 +210,10 @@ const Playlists = () => {
             <div className="w-9 h-9 rounded-xl bg-[#272727] flex items-center justify-center">
               <ListVideo size={18} className="text-[#f1f1f1]" />
             </div>
-            <h1 className="text-xl font-bold text-[#f1f1f1]">Playlists</h1>
+            <div>
+              <h1 className="text-xl font-bold text-[#f1f1f1]">Playlists</h1>
+              <p className="text-xs text-[#555] mt-0.5">Your personal saved playlists</p>
+            </div>
           </div>
           <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
             <Plus size={14} />
@@ -209,8 +224,8 @@ const Playlists = () => {
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-[#1a1a1a] p-1 rounded-xl w-fit">
           {[
-            { key: 'mine', label: 'My Playlists', icon: ListVideo },
-            { key: 'collaborative', label: 'Collaborative', icon: Users },
+            { key: 'mine',          label: 'My Playlists',   icon: ListVideo },
+            { key: 'collaborative', label: 'Collaborative',  icon: Users },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -229,6 +244,7 @@ const Playlists = () => {
           ))}
         </div>
 
+        {/* Grid */}
         {activeLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -243,14 +259,16 @@ const Playlists = () => {
           </div>
         ) : activeList.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-20 text-center">
-            {tab === 'mine' ? <ListVideo size={40} className="text-[#606060]" /> : <Users size={40} className="text-[#606060]" />}
+            {tab === 'mine'
+              ? <ListVideo size={40} className="text-[#606060]" />
+              : <Users size={40} className="text-[#606060]" />}
             <p className="text-[#f1f1f1] font-medium">
               {tab === 'mine' ? 'No playlists yet' : 'No collaborative playlists'}
             </p>
             <p className="text-sm text-[#aaaaaa]">
               {tab === 'mine'
-                ? 'Create a playlist to organize your videos'
-                : 'You haven\'t been added as a collaborator to any playlist yet'}
+                ? 'Save videos to a playlist to watch them later'
+                : "You haven't been added as a collaborator to any playlist yet"}
             </p>
             {tab === 'mine' && (
               <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>

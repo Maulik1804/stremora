@@ -7,6 +7,7 @@ import {
   TrendingUp, Upload, BarChart2, Clock,
 } from 'lucide-react';
 import api from '../services/api';
+import { videoService } from '../services/video.service';
 import StatCard from '../components/ui/StatCard';
 import Spinner from '../components/ui/Spinner';
 import XPStreakCard from '../components/features/XPStreakCard';
@@ -91,10 +92,10 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [period, setPeriod] = useState('28');
 
-  // Channel-level stats (aggregate from videos)
+  // Creator's own videos only — all statuses & visibilities
   const { data: videosData, isLoading: videosLoading } = useQuery({
     queryKey: ['dashboard-videos'],
-    queryFn: () => api.get('/videos').then((r) => r.data.data),
+    queryFn: () => videoService.getMyVideos().then((r) => r.data.data),
   });
 
   // Subscriber count

@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Edit2, Trash2, Eye, ThumbsUp, MessageSquare, Globe, Lock, Link2, AlertTriangle } from 'lucide-react';
+import { Upload, Edit2, Trash2, Eye, ThumbsUp, MessageSquare, Globe, Lock, Link2, AlertTriangle, Film } from 'lucide-react';
 import api from '../services/api';
 import { videoService } from '../services/video.service';
+import AddToSeriesModal from '../components/series/AddToSeriesModal';
 import Spinner from '../components/ui/Spinner';
 import Button from '../components/ui/Button';
 import { formatCount } from '../utils/format';
@@ -66,10 +67,11 @@ const Studio = () => {
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [filter, setFilter] = useState('all'); // all | published | processing | private
+  const [seriesTarget, setSeriesTarget] = useState(null); // videoId for AddToSeriesModal
 
   const { data, isLoading } = useQuery({
     queryKey: ['studio-videos'],
-    queryFn: () => api.get('/videos').then((r) => r.data.data),
+    queryFn: () => videoService.getMyVideos().then((r) => r.data.data),
   });
 
   const deleteMutation = useMutation({
@@ -99,6 +101,12 @@ const Studio = () => {
             onConfirm={() => deleteMutation.mutate(deleteTarget._id)}
             onCancel={() => setDeleteTarget(null)}
             isDeleting={deleteMutation.isPending}
+          />
+        )}
+        {seriesTarget && (
+          <AddToSeriesModal
+            videoId={seriesTarget}
+            onClose={() => setSeriesTarget(null)}
           />
         )}
       </AnimatePresence>
@@ -228,6 +236,18 @@ const Studio = () => {
                               <Eye size={15} />
                             </button>
                           </Link>
+                          <Link to={`/studio/edit/${v._id}`}>
+                            <button className="p-1.5 rounded-lg hover:bg-[#272727] text-[#aaaaaa] hover:text-[#f1f1f1] transition-colors" title="Edit">
+                              <Edit2 size={15} />
+                            </button>
+                          </Link>
+                          <button
+                            onClick={() => setSeriesTarget(v._id)}
+                            className="p-1.5 rounded-lg hover:bg-[#272727] text-[#aaaaaa] hover:text-[#f1f1f1] transition-colors"
+                            title="Add to Channel Playlist"
+                          >
+                            <Film size={15} />
+                          </button>
                           <button
                             onClick={() => setDeleteTarget(v)}
                             className="p-1.5 rounded-lg hover:bg-red-900/30 text-[#aaaaaa] hover:text-red-400 transition-colors"

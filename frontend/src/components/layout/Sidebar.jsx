@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Compass, PlaySquare, ThumbsUp, ListVideo,
   Bell, History, LayoutDashboard, Settings, Clapperboard,
-  TrendingUp, Target, X, LogIn,
+  TrendingUp, Target, X, LogIn, Film,
 } from 'lucide-react';
 import { useSidebar } from '../../hooks/useSidebar';
 import { useAuth } from '../../hooks/useAuth';
@@ -27,9 +27,10 @@ const NAV_AUTH = [
 ];
 
 const NAV_CREATOR = [
-  { icon: LayoutDashboard, label: 'Dashboard', to: '/dashboard' },
-  { icon: Clapperboard,    label: 'Studio',    to: '/studio' },
-  { icon: Settings,        label: 'Settings',  to: '/settings' },
+  { icon: LayoutDashboard, label: 'Dashboard',         to: '/dashboard' },
+  { icon: Clapperboard,    label: 'Studio',             to: '/studio' },
+  { icon: Film,            label: 'Channel Playlists',  to: '/series' },
+  { icon: Settings,        label: 'Settings',           to: '/settings' },
 ];
 
 // ── NavItem ───────────────────────────────────────────────────────────────────

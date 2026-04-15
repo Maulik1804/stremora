@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ListVideo, Lock, Globe, Users, Trash2, Play, Clock,
+  ListVideo, Lock, Globe, Users, Trash2, Play, Clock, Film,
 } from 'lucide-react';
 import { engagementService } from '../services/engagement.service';
 import CollaboratorModal from '../components/engagement/CollaboratorModal';
@@ -43,19 +43,36 @@ const PlaylistDetail = () => {
   if (isError || !playlist) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
       <p className="text-[#f1f1f1] font-medium">Playlist not found</p>
-      <Link to="/playlists" className="text-[#3ea6ff] text-sm hover:underline">Back to playlists</Link>
+      <Link to="/playlists" className="text-[#3ea6ff] text-sm hover:underline">← Back to playlists</Link>
     </div>
   );
 
   const isOwner = user && playlist.owner?._id === user._id;
-  const isCollaborator = user && playlist.collaborators?.some((c) => c._id === user._id || c === user._id);
+  const isChannelPlaylist = !!playlist.isSeries;
+
+  // Channel playlists have their own dedicated page — redirect there
+  if (isChannelPlaylist) {
+    return <Navigate to={`/channel-playlist/${id}`} replace />;
+  }
+
+  // For channel playlists: only the owner can edit/remove videos
+  // For personal playlists: owner OR collaborator can edit
+  const isCollaborator = !isChannelPlaylist &&
+    user && playlist.collaborators?.some((c) => c._id === user._id || c === user._id);
   const canEdit = isOwner || isCollaborator;
+
   const videos = playlist.videos ?? [];
+
+  // Thumbnail: for channel playlists use seriesThumbnail or first video; for personal use first video
+  const coverThumbnail = isChannelPlaylist
+    ? (playlist.seriesThumbnail || videos[0]?.thumbnailUrl || '')
+    : (videos[0]?.thumbnailUrl || '');
 
   return (
     <>
       <AnimatePresence>
-        {showCollaborators && isOwner && (
+        {/* Collaborator management — only for personal playlists, owner only */}
+        {showCollaborators && isOwner && !isChannelPlaylist && (
           <CollaboratorModal
             playlistId={id}
             playlistTitle={playlist.title}
@@ -66,6 +83,7 @@ const PlaylistDetail = () => {
 
       <div className="px-4 py-6 max-w-screen-xl mx-auto">
         <div className="flex flex-col lg:flex-row gap-8">
+
           {/* ── Sidebar info ── */}
           <div className="lg:w-72 flex-shrink-0">
             <motion.div
@@ -73,19 +91,28 @@ const PlaylistDetail = () => {
               animate={{ opacity: 1, y: 0 }}
               className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden sticky top-20"
             >
-              {/* Thumbnail */}
+              {/* Cover thumbnail */}
               <div className="aspect-video bg-[#272727] relative">
-                {videos[0]?.thumbnailUrl ? (
-                  <img src={videos[0].thumbnailUrl} alt={playlist.title} className="w-full h-full object-cover" />
+                {coverThumbnail ? (
+                  <img src={coverThumbnail} alt={playlist.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <ListVideo size={40} className="text-[#606060]" />
+                    {isChannelPlaylist
+                      ? <Film size={40} className="text-[#606060]" />
+                      : <ListVideo size={40} className="text-[#606060]" />}
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute bottom-3 left-3 text-white text-sm font-medium">
-                  {videos.length} videos
+                  {videos.length} video{videos.length !== 1 ? 's' : ''}
                 </div>
+                {/* Channel playlist badge */}
+                {isChannelPlaylist && (
+                  <div className="absolute top-2 left-2 bg-[#ff0000]/90 text-white text-[10px]
+                                  font-bold px-2 py-0.5 rounded-md tracking-wide uppercase">
+                    Channel Playlist
+                  </div>
+                )}
               </div>
 
               <div className="p-4 flex flex-col gap-3">
@@ -102,7 +129,7 @@ const PlaylistDetail = () => {
                   </Link>
                 </div>
 
-                {/* Visibility */}
+                {/* Visibility + updated */}
                 <div className="flex items-center gap-1.5 text-xs text-[#606060]">
                   {playlist.visibility === 'private'
                     ? <><Lock size={11} /> Private</>
@@ -116,8 +143,8 @@ const PlaylistDetail = () => {
                   <p className="text-xs text-[#aaaaaa] line-clamp-3">{playlist.description}</p>
                 )}
 
-                {/* Collaborators badge */}
-                {(playlist.collaborators?.length > 0 || isOwner) && (
+                {/* Collaborators — only for personal playlists */}
+                {!isChannelPlaylist && (playlist.collaborators?.length > 0 || isOwner) && (
                   <div className="flex items-center justify-between pt-1 border-t border-[#2a2a2a]">
                     <div className="flex items-center gap-1.5 text-xs text-[#aaaaaa]">
                       <Users size={12} className="text-[#3ea6ff]" />
@@ -152,10 +179,16 @@ const PlaylistDetail = () => {
           <div className="flex-1 min-w-0">
             {videos.length === 0 ? (
               <div className="flex flex-col items-center gap-4 py-20 text-center">
-                <ListVideo size={40} className="text-[#606060]" />
+                {isChannelPlaylist
+                  ? <Film size={40} className="text-[#606060]" />
+                  : <ListVideo size={40} className="text-[#606060]" />}
                 <p className="text-[#f1f1f1] font-medium">No videos in this playlist</p>
                 {canEdit && (
-                  <p className="text-sm text-[#aaaaaa]">Browse videos and save them to this playlist</p>
+                  <p className="text-sm text-[#aaaaaa]">
+                    {isChannelPlaylist
+                      ? 'Add videos from Studio → Channel Playlists'
+                      : 'Browse videos and save them to this playlist'}
+                  </p>
                 )}
               </div>
             ) : (
@@ -168,14 +201,18 @@ const PlaylistDetail = () => {
                     transition={{ delay: idx * 0.03 }}
                     className="flex items-start gap-3 group"
                   >
-                    <span className="text-xs text-[#606060] w-5 text-right mt-3 flex-shrink-0">{idx + 1}</span>
+                    <span className="text-xs text-[#606060] w-5 text-right mt-3 flex-shrink-0">
+                      {idx + 1}
+                    </span>
                     <div className="flex-1 min-w-0">
                       <VideoCard video={video} horizontal={true} />
                     </div>
+                    {/* Remove button — only for editors */}
                     {canEdit && (
                       <button
                         onClick={() => removeVideoMutation.mutate(video._id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity mt-3 p-1.5 rounded-lg hover:bg-red-900/30 text-[#606060] hover:text-red-400 flex-shrink-0"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity mt-3 p-1.5
+                                   rounded-lg hover:bg-red-900/30 text-[#606060] hover:text-red-400 flex-shrink-0"
                         aria-label="Remove from playlist"
                       >
                         <Trash2 size={14} />

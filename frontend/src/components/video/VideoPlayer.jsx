@@ -84,46 +84,53 @@ const ProgressBar = ({ currentTime, duration, buffered, onSeek, onSeeking }) => 
   );
 };
 
-// ── Volume control — custom styled, no native accent overflow ─────────────────
+// ── Volume control — professional YouTube-style ────────────────────────────────
 const VolumeControl = ({ volume, muted, onToggleMute, onChangeVolume }) => {
   const [expanded, setExpanded] = useState(false);
   const val = muted ? 0 : volume;
-
   const Icon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
 
   return (
     <div
-      className="flex items-center gap-1.5"
+      className="flex items-center gap-2 group"
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
     >
       <button
         onClick={onToggleMute}
-        className="text-white/80 hover:text-white transition-colors p-1 flex-shrink-0"
+        className="text-white/70 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0"
         aria-label={muted ? 'Unmute' : 'Mute'}
       >
-        <Icon size={17} />
+        <Icon size={18} />
       </button>
 
-      {/* Custom volume slider */}
-      <div
-        className="overflow-hidden transition-all duration-200"
-        style={{ width: expanded ? '72px' : '0px', opacity: expanded ? 1 : 0 }}
+      {/* Volume slider — appears on hover */}
+      <motion.div
+        initial={{ opacity: 0, width: 0 }}
+        animate={{ opacity: expanded ? 1 : 0, width: expanded ? 80 : 0 }}
+        transition={{ duration: 0.2 }}
+        className="overflow-hidden"
       >
-        <div className="relative h-1 bg-white/20 rounded-full cursor-pointer w-[72px]"
+        <div className="relative h-1.5 bg-white/20 rounded-full cursor-pointer w-20 hover:h-2 transition-all"
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
             onChangeVolume(x / rect.width);
           }}
+          onMouseMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+            const pct = (x / rect.width) * 100;
+            e.currentTarget.style.setProperty('--volume-hover', `${pct}%`);
+          }}
         >
-          <div className="absolute inset-y-0 left-0 bg-white rounded-full" style={{ width: `${val * 100}%` }} />
+          <div className="absolute inset-y-0 left-0 bg-[#ff0000] rounded-full transition-all" style={{ width: `${val * 100}%` }} />
           <div
-            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md"
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
             style={{ left: `calc(${val * 100}% - 6px)` }}
           />
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
@@ -149,31 +156,63 @@ const SkipFeedback = ({ direction }) => (
   </motion.div>
 );
 
-// ── Speed menu ────────────────────────────────────────────────────────────────
-const SpeedMenu = ({ playbackRate, onChange }) => (
-  <div className="relative group/speed">
-    <button
-      className="text-white/80 hover:text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-all"
-      aria-label="Playback speed"
-    >
-      {playbackRate}×
-    </button>
-    <div className="absolute bottom-full right-0 mb-2 hidden group-hover/speed:block z-10">
-      <div className="bg-[#111]/95 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-2xl min-w-[76px] py-1">
-        {SPEEDS.map((s) => (
-          <button
-            key={s}
-            onClick={() => onChange(s)}
-            className={`w-full text-center px-4 py-2 text-xs font-medium transition-colors
-              ${playbackRate === s ? 'text-white bg-white/10' : 'text-white/60 hover:text-white hover:bg-white/6'}`}
+// ── Speed menu — professional state-based with animations ────────────────────
+const SpeedMenu = ({ playbackRate, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="text-white/80 hover:text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-all"
+        aria-label="Playback speed"
+        aria-expanded={isOpen}
+      >
+        {playbackRate}×
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute bottom-full right-0 mb-2 z-50"
+            onClick={(e) => e.stopPropagation()}
           >
-            {s}×
-          </button>
-        ))}
-      </div>
+            <div className="bg-[#1a1a1a]/98 backdrop-blur-lg border border-white/15 rounded-xl overflow-hidden shadow-2xl min-w-[88px] py-1.5">
+              {SPEEDS.map((s) => (
+                <motion.button
+                  key={s}
+                  onClick={() => {
+                    onChange(s);
+                    setIsOpen(false);
+                  }}
+                  whileHover={{ backgroundColor: 'rgba(255, 255, 255, 0.08)' }}
+                  className={`w-full text-center px-4 py-2.5 text-xs font-semibold transition-all
+                    ${playbackRate === s
+                      ? 'text-[#ff0000] bg-white/10'
+                      : 'text-white/70 hover:text-white'}`}
+                >
+                  {s}×
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Close menu when clicking outside */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // ── Main VideoPlayer ──────────────────────────────────────────────────────────
 const VideoPlayer = ({ src, poster, onTimeUpdate, onEnded, videoId, audioOnly = false, videoTitle = '', focusMode = false }) => {
@@ -187,13 +226,33 @@ const VideoPlayer = ({ src, poster, onTimeUpdate, onEnded, videoId, audioOnly = 
     handleContainerTap,
   } = useVideoPlayer();
 
+  // Double-tap fullscreen toggle
+  const lastTapRef = useRef(0);
+
+  const handleDoubleTap = (e) => {
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapRef.current;
+
+    if (timeSinceLastTap < 300) {
+      // Double tap detected — toggle fullscreen
+      e.preventDefault();
+      toggleFullscreen();
+    }
+
+    lastTapRef.current = now;
+  };
+
   return (
     <div
       ref={containerRef}
       className={`relative w-full bg-black select-none ${focusMode ? 'h-screen rounded-none' : 'aspect-video rounded-2xl overflow-hidden'}`}
       onMouseMove={resetHideTimer}
       onMouseLeave={resetHideTimer}
-      onClick={handleContainerTap}
+      onClick={(e) => {
+        handleDoubleTap(e);
+        handleContainerTap();
+      }}
+      onDoubleClick={(e) => e.preventDefault()}
       style={{ cursor: showControls ? 'default' : 'none' }}
     >
       {/* Video */}
@@ -249,15 +308,15 @@ const VideoPlayer = ({ src, poster, onTimeUpdate, onEnded, videoId, audioOnly = 
         )}
       </AnimatePresence>
 
-      {/* Controls overlay */}
+      {/* Controls overlay — always visible in audio mode, auto-hide in video mode */}
       <AnimatePresence>
-        {showControls && (
+        {(showControls || audioOnly) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="absolute inset-0 flex flex-col justify-end pointer-events-none"
+            className="absolute inset-0 flex flex-col justify-end pointer-events-none z-20"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Bottom gradient */}

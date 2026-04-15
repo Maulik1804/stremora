@@ -1,15 +1,35 @@
 'use strict';
 
 const { Router } = require('express');
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 
-const { toggleReaction, getLikedVideos } = require('../controllers/like.controller');
+const { toggleReaction, getVideoReaction, getCommentReaction, getLikedVideos } = require('../controllers/like.controller');
 const verifyJWT = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 
 const router = Router();
 
 router.get('/me/videos', verifyJWT, getLikedVideos);
+
+router.get(
+  '/video/:videoId',
+  verifyJWT,
+  [
+    param('videoId').isMongoId().withMessage('Invalid videoId'),
+  ],
+  validate,
+  getVideoReaction
+);
+
+router.get(
+  '/comment/:commentId',
+  verifyJWT,
+  [
+    param('commentId').isMongoId().withMessage('Invalid commentId'),
+  ],
+  validate,
+  getCommentReaction
+);
 
 router.post(
   '/',

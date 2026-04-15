@@ -108,7 +108,7 @@ export const useUpload = () => {
     setThumbnailPreview(null);
   }, [thumbnailPreview]);
 
-  // ── Upload ────────────────────────────────────────────────────────────────
+  // ── Upload with chunking ─────────────────────────────────────────────────
 
   const upload = useCallback(async (formValues) => {
     if (!videoFile) return;
@@ -120,33 +120,110 @@ export const useUpload = () => {
     abortRef.current = controller;
 
     try {
-      const fd = new FormData();
-      fd.append('video', videoFile);
-      fd.append('title', formValues.title);
-      fd.append('description', formValues.description || '');
-      fd.append('visibility', formValues.visibility);
-      if (formValues.tags) fd.append('tags', formValues.tags);
+      // Chunk size: 5MB for faster uploads
+      const CHUNK_SIZE = 5 * 1024 * 1024;
+      const totalChunks = Math.ceil(videoFile.size / CHUNK_SIZE);
+      let uploadedBytes = 0;
 
-      const { data } = await videoService.create(fd, (evt) => {
-        if (evt.total) {
-          setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
-        }
+      console.log(`[Upload] Starting chunked upload: ${videoFile.name} (${(videoFile.size / 1024 / 1024).toFixed(2)} MB, ${totalChunks} chunks)`);
+
+      // Step 1: Initialize upload session
+      console.log('[Upload] Initializing upload session...');
+      const initRes = await videoService.initChunkedUpload({
+        fileName: videoFile.name,
+        fileSize: videoFile.size,
+        title: formValues.title,
+        description: formValues.description || '',
+        visibility: formValues.visibility,
+        tags: formValues.tags || '',
       });
 
-      const createdVideo = data.data.video;
-      setUploadedVideo(createdVideo);
+      const uploadSessionId = initRes.data.data.uploadSessionId;
+      console.log(`[Upload] Session initialized: ${uploadSessionId}`);
 
-      // Upload custom thumbnail if provided
-      if (thumbnailFile && createdVideo._id) {
-        const tfd = new FormData();
-        tfd.append('thumbnail', thumbnailFile);
-        await videoService.uploadThumbnail(createdVideo._id, tfd);
+      // Step 2: Upload chunks
+      console.log(`[Upload] Uploading ${totalChunks} chunks...`);
+      for (let i = 0; i < totalChunks; i++) {
+        if (controller.signal.aborted) throw new Error('Upload cancelled');
+
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, videoFile.size);
+        const chunk = videoFile.slice(start, end);
+
+        const chunkFd = new FormData();
+        chunkFd.append('chunk', chunk);
+        chunkFd.append('chunkIndex', i);
+        chunkFd.append('totalChunks', totalChunks);
+
+        try {
+          await videoService.uploadChunk(uploadSessionId, chunkFd);
+        } catch (chunkErr) {
+          console.error(`[Upload] Chunk ${i} failed:`, chunkErr.message);
+          
+          // Check if it's an auth error (token expired)
+          if (chunkErr.response?.status === 401) {
+            throw new Error('Your session has expired. Please log in again and retry the upload.');
+          }
+          
+          throw new Error(`Failed to upload chunk ${i + 1} of ${totalChunks}: ${chunkErr.response?.data?.message || chunkErr.message}`);
+        }
+
+        uploadedBytes += chunk.size;
+        // Show 0-90% progress during chunk upload
+        const progress = Math.round((uploadedBytes / videoFile.size) * 90);
+        setUploadProgress(progress);
+        console.log(`[Upload] Progress: ${progress}% (${i + 1}/${totalChunks} chunks)`);
       }
 
-      setStep(UPLOAD_STEPS.SUCCESS);
+      // Step 3: Finalize upload (show 90-100% progress)
+      console.log('[Upload] Finalizing upload (uploading to storage service)...');
+      setUploadProgress(90);
+      
+      try {
+        const finalRes = await videoService.finalizeChunkedUpload(uploadSessionId);
+        const createdVideo = finalRes.data.data.video;
+        setUploadedVideo(createdVideo);
+        console.log(`[Upload] Video created: ${createdVideo._id}`);
+        setUploadProgress(95);
+
+        // Upload custom thumbnail if provided
+        if (thumbnailFile && createdVideo._id) {
+          console.log('[Upload] Uploading custom thumbnail...');
+          const tfd = new FormData();
+          tfd.append('thumbnail', thumbnailFile);
+          await videoService.uploadThumbnail(createdVideo._id, tfd);
+          console.log('[Upload] Thumbnail uploaded');
+        }
+
+        setUploadProgress(100);
+        setStep(UPLOAD_STEPS.SUCCESS);
+        console.log('[Upload] Upload completed successfully');
+      } catch (finalizeErr) {
+        console.error('[Upload] Finalization error:', finalizeErr.message);
+        
+        // Check if it's an auth error (token expired)
+        if (finalizeErr.response?.status === 401) {
+          throw new Error('Your session has expired during upload. Please log in again and retry the upload.');
+        }
+        
+        const errorMsg = finalizeErr.response?.data?.message || finalizeErr.message;
+        
+        // Provide helpful error messages
+        if (errorMsg.includes('timeout')) {
+          throw new Error('Upload to storage service timed out. This usually means the file is too large or your connection is slow. Please try again.');
+        } else if (errorMsg.includes('100 MB')) {
+          throw new Error('File exceeds the 100 MB limit. Please use a smaller file.');
+        } else {
+          throw new Error(`Upload failed: ${errorMsg}`);
+        }
+      }
     } catch (err) {
-      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      const msg = err.response?.data?.message || err.message || 'Upload failed. Please try again.';
+      if (err.name === 'CanceledError' || err.name === 'AbortError') {
+        console.log('[Upload] Upload cancelled by user');
+        return;
+      }
+      const msg = err.message || 'Upload failed. Please try again.';
+      console.error('[Upload] Error:', msg);
       setError(msg);
       setStep(UPLOAD_STEPS.ERROR);
     }
