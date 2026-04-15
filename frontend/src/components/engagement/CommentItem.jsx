@@ -24,7 +24,6 @@ const CommentItem = ({ comment, videoId, depth = 0 }) => {
     queryKey: ['replies', comment._id],
     queryFn: () => engagementService.getReplies(comment._id).then((r) => r.data.data),
     enabled: showReplies && depth === 0,
-    staleTime: 30_000,
   });
 
   // ── Post reply ────────────────────────────────────────────────────────────

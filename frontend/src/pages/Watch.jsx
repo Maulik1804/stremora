@@ -47,7 +47,6 @@ const Watch = () => {
   const [descExpanded, setDescExpanded] = useState(false);
   const [reaction, setReaction] = useState(null);
   const [subscribed, setSubscribed] = useState(false);
-  const [subscriberCount, setSubscriberCount] = useState(0);
   const [showShare, setShowShare] = useState(false);
   const [showSave, setShowSave] = useState(false);
   const [audioOnly, setAudioOnly] = useState(false);
@@ -58,16 +57,15 @@ const Watch = () => {
   const { data: video, isLoading, isError } = useQuery({
     queryKey: ['video', id],
     queryFn: () => videoService.getById(id).then((r) => r.data.data.video),
-    staleTime: 60_000,
   });
 
-  // Seed subscribed + subscriberCount from video data whenever it loads
+  // Derive subscriberCount directly from video data (never stale)
+  const subscriberCount = video?.owner?.subscriberCount ?? 0;
+
+  // Sync subscribed state when video data loads/changes
   useEffect(() => {
-    if (video?.owner) {
-      setSubscribed(video.owner.isSubscribed ?? false);
-      setSubscriberCount(video.owner.subscriberCount ?? 0);
-    }
-  }, [video?.owner?._id, video?.owner?.subscriberCount, video?.owner?.isSubscribed]);
+    if (video?.owner) setSubscribed(video.owner.isSubscribed ?? false);
+  }, [video?.owner?._id, video?.owner?.isSubscribed]);
 
   // ── Record view + history ─────────────────────────────────────────────────
   const handleTimeUpdate = (currentTime) => {
@@ -97,7 +95,6 @@ const Watch = () => {
     setReaction(null);
     setDescExpanded(false);
     setSubscribed(false);
-    setSubscriberCount(0);
     setAudioOnly(false);
 
     // Feature 15: double-tap center → like
@@ -131,17 +128,13 @@ const Watch = () => {
     },
     onSuccess: (res) => {
       const isNowSubscribed = res.data.data.subscribed;
-      const newCount = res.data.data.subscriberCount;
       setSubscribed(isNowSubscribed);
-      if (typeof newCount === 'number') {
-        setSubscriberCount(newCount);
-      } else {
-        setSubscriberCount((c) => isNowSubscribed ? c + 1 : Math.max(0, c - 1));
-      }
+      // Invalidate so subscriberCount re-fetches from server
+      queryClient.invalidateQueries({ queryKey: ['video', id] });
+      queryClient.invalidateQueries({ queryKey: ['channel', video?.owner?.username] });
       toast.success(isNowSubscribed
         ? `Subscribed to ${video?.owner?.displayName || video?.owner?.username}`
         : 'Unsubscribed');
-      queryClient.invalidateQueries({ queryKey: ['channel', video?.owner?.username] });
     },
     onError: (err) => {
       const msg = err?.response?.data?.message || err?.message || 'Failed to update subscription';

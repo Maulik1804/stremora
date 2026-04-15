@@ -39,7 +39,6 @@ const Category = () => {
         .then((r) => r.data.data),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: !!slug,
-    staleTime: 60_000,
   });
 
   useEffect(() => {

@@ -17,7 +17,6 @@ const SkipSegments = ({ videoId, duration, currentTime, onSeek }) => {
   const { data } = useQuery({
     queryKey: ['skip-segments', videoId],
     queryFn: () => featuresService.getSkipSegments(videoId).then((r) => r.data.data),
-    staleTime: 60_000,
     enabled: !!videoId,
   });
 

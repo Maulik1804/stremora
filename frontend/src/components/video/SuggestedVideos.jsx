@@ -7,7 +7,6 @@ const SuggestedVideos = ({ currentVideoId }) => {
   const { data, isLoading } = useQuery({
     queryKey: ['suggested', currentVideoId],
     queryFn: () => videoService.getFeed().then((r) => r.data.data),
-    staleTime: 60_000,
   });
 
   const videos = (data?.videos ?? []).filter((v) => v._id !== currentVideoId).slice(0, 15);

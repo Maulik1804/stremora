@@ -13,7 +13,6 @@ const SaveToPlaylistModal = ({ videoId, onClose }) => {
   const { data, isLoading } = useQuery({
     queryKey: ['my-playlists'],
     queryFn: () => engagementService.getMyPlaylists().then((r) => r.data.data),
-    staleTime: 30_000,
   });
 
   const playlists = data?.playlists ?? [];

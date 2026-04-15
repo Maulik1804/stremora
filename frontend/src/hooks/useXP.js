@@ -11,7 +11,6 @@ export const useXP = () => {
     queryKey: ['xp'],
     queryFn: () => featuresService.getXP().then((r) => r.data.data),
     enabled: isAuthenticated,
-    staleTime: 60_000,
   });
 
   const awardMutation = useMutation({

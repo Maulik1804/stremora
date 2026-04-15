@@ -95,7 +95,6 @@ const Dashboard = () => {
   const { data: videosData, isLoading: videosLoading } = useQuery({
     queryKey: ['dashboard-videos'],
     queryFn: () => api.get('/videos').then((r) => r.data.data),
-    staleTime: 60_000,
   });
 
   // Subscriber count
@@ -103,7 +102,6 @@ const Dashboard = () => {
     queryKey: ['subscriber-count', user?._id],
     queryFn: () => api.get(`/subscriptions/channel/${user._id}`).then((r) => r.data.data),
     enabled: !!user?._id,
-    staleTime: 60_000,
   });
 
   const videos = videosData?.videos ?? [];

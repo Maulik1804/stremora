@@ -25,7 +25,6 @@ const PlaylistDetail = () => {
   const { data: playlist, isLoading, isError } = useQuery({
     queryKey: ['playlist', id],
     queryFn: () => engagementService.getPlaylist(id).then((r) => r.data.data.playlist),
-    staleTime: 30_000,
   });
 
   const removeVideoMutation = useMutation({

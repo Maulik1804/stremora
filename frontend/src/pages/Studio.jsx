@@ -70,7 +70,6 @@ const Studio = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['studio-videos'],
     queryFn: () => api.get('/videos').then((r) => r.data.data),
-    staleTime: 30_000,
   });
 
   const deleteMutation = useMutation({

@@ -65,7 +65,6 @@ const Notifications = () => {
     queryFn: ({ pageParam }) =>
       engagementService.getNotifications(pageParam).then((r) => r.data.data),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
-    staleTime: 30_000,
   });
 
   useEffect(() => {

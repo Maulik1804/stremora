@@ -62,7 +62,6 @@ const ContinueWatching = () => {
     queryKey: ['continue-watching'],
     queryFn: () => featuresService.getContinueWatching().then((r) => r.data.data),
     enabled: isAuthenticated,
-    staleTime: 60_000,
   });
 
   const videos = data?.videos ?? [];

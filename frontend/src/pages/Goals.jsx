@@ -253,7 +253,6 @@ const Goals = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['goals'],
     queryFn: () => goalService.getGoals().then((r) => r.data.data.goals),
-    staleTime: 30_000,
   });
 
   const goals = data ?? [];

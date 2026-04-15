@@ -14,7 +14,6 @@ const PinnedComment = ({ videoId, onSeek }) => {
   const { data } = useQuery({
     queryKey: ['pinned-comment', videoId],
     queryFn: () => featuresService.getPinnedComment(videoId).then((r) => r.data.data),
-    staleTime: 60_000,
     enabled: !!videoId,
   });
 

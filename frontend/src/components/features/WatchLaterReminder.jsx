@@ -14,7 +14,6 @@ const WatchLaterReminder = () => {
     queryKey: ['watch-later-reminders'],
     queryFn: () => featuresService.getWatchLaterReminders().then((r) => r.data.data),
     enabled: isAuthenticated,
-    staleTime: 300_000,
     refetchInterval: 10 * 60 * 1000, // re-check every 10 min
   });
 

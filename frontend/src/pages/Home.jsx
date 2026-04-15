@@ -37,7 +37,6 @@ const Home = () => {
     queryKey: ['feed', activeCategory],
     queryFn: ({ pageParam }) => videoService.getFeed(pageParam).then((r) => r.data.data),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
-    staleTime: 60_000,
   });
 
   useEffect(() => {

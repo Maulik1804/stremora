@@ -10,7 +10,6 @@ const LikedVideos = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['liked-videos'],
     queryFn: () => api.get('/likes/me/videos').then((r) => r.data.data),
-    staleTime: 30_000,
   });
 
   const videos = data?.videos ?? [];

@@ -163,13 +163,11 @@ const Playlists = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['my-playlists'],
     queryFn: () => engagementService.getMyPlaylists().then((r) => r.data.data),
-    staleTime: 30_000,
   });
 
   const { data: collabData, isLoading: collabLoading } = useQuery({
     queryKey: ['collaborative-playlists'],
     queryFn: () => engagementService.getCollaborativePlaylists().then((r) => r.data.data),
-    staleTime: 30_000,
   });
 
   const deleteMutation = useMutation({

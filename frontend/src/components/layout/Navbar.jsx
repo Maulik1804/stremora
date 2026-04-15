@@ -99,22 +99,7 @@ const SearchBox = ({ onSearch, autoFocus = false, className = '' }) => {
             spellCheck={false}
           />
 
-          <AnimatePresence>
-            {query && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.7 }}
-                transition={{ duration: 0.12 }}
-                type="button"
-                onClick={() => { setQuery(''); inputRef.current?.focus(); }}
-                className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/18 text-[#aaa] hover:text-white transition-colors"
-                aria-label="Clear"
-              >
-                <X size={11} />
-              </motion.button>
-            )}
-          </AnimatePresence>
+          
 
           {/* Divider + search button */}
           <div className="w-px h-4 bg-white/8 flex-shrink-0" />

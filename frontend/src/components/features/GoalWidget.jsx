@@ -12,7 +12,6 @@ const GoalWidget = () => {
     queryKey: ['active-goal'],
     queryFn: () => goalService.getActive().then((r) => r.data.data.goal),
     enabled: isAuthenticated,
-    staleTime: 60_000,
   });
 
   if (!isAuthenticated || !goal) return null;

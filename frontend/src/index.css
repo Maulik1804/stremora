@@ -68,9 +68,6 @@ body {
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
-/* ── Focus ─────────────────────────────────────────────────────────────────── */
-:focus-visible { outline: 2px solid rgba(229,9,20,0.5); outline-offset: 2px; border-radius: 6px; }
-
 /* ── Selection ─────────────────────────────────────────────────────────────── */
 ::selection { background: rgba(229,9,20,0.25); color: #fff; }
 

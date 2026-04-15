@@ -186,7 +186,6 @@ const Search = () => {
       videoService.search({ q, sort, date, duration, cursor: pageParam }).then((r) => r.data.data),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: q.trim().length >= 2,
-    staleTime: 30_000,
   });
 
   useEffect(() => {

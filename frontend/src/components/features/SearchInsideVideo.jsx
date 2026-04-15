@@ -19,7 +19,6 @@ const SearchInsideVideo = ({ videoId, onSeek }) => {
     queryKey: ['video-keywords', videoId, debouncedQuery],
     queryFn: () => featuresService.searchKeywords(videoId, debouncedQuery).then((r) => r.data.data),
     enabled: !!videoId && debouncedQuery.trim().length >= 1,
-    staleTime: 60_000,
   });
 
   const matches = data?.matches ?? [];

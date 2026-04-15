@@ -14,7 +14,6 @@ const TimestampComments = ({ videoId, onSeek, currentTime = 0 }) => {
   const { data, isLoading } = useQuery({
     queryKey: ['timestamp-comments', videoId],
     queryFn: () => featuresService.getTimestampComments(videoId).then((r) => r.data.data),
-    staleTime: 30_000,
     enabled: !!videoId,
   });
 

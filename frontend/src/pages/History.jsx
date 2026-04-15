@@ -22,7 +22,6 @@ const History = () => {
     queryFn: ({ pageParam }) =>
       engagementService.getHistory(pageParam).then((r) => r.data.data),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
-    staleTime: 30_000,
   });
 
   useEffect(() => {

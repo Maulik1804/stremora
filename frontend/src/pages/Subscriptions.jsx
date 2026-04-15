@@ -14,7 +14,6 @@ const Subscriptions = () => {
     queryKey: ['subscriptions-feed'],
     queryFn: ({ pageParam }) => videoService.getSubscriptionFeed(pageParam).then((r) => r.data.data),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
-    staleTime: 60_000,
   });
 
   useEffect(() => {

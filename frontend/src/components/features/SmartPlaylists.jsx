@@ -66,7 +66,6 @@ const SmartPlaylists = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['smart-playlists'],
     queryFn: () => featuresService.getSmartPlaylists().then((r) => r.data.data),
-    staleTime: 300_000,
   });
 
   const playlists = data?.playlists ?? [];

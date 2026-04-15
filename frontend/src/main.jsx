@@ -12,7 +12,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,   // refetch when user switches back to tab
+      refetchOnMount: true,          // refetch every time a component mounts
+      staleTime: 0,                  // data is always considered stale → always refetch on navigate
     },
   },
 });

@@ -79,7 +79,6 @@ const Trending = () => {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['trending', activeTab],
     queryFn: () => videoService.getTrending().then((r) => r.data.data),
-    staleTime: 60_000,
   });
 
   const videos = data?.videos ?? [];

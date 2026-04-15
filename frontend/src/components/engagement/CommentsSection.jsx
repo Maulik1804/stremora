@@ -32,7 +32,6 @@ const CommentsSection = ({ videoId, commentCount = 0 }) => {
       engagementService.getComments(videoId, pageParam, sort).then((r) => r.data.data),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: !!videoId,
-    staleTime: 30_000,
   });
 
   // Infinite scroll
