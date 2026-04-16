@@ -7,7 +7,7 @@
 # When the tunnel URL changes, update ONLY the "to" line below.
 [[redirects]]
   from = "/api/*"
-  to = "https://emacs-hair-deals-chapter.trycloudflare.com/api/:splat"
+  to = "https://dentists-fine-scanner-asbestos.trycloudflare.com/api/:splat"
   status = 200
   force = true
 
