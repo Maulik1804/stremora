@@ -1,8 +1,8 @@
-import { useRef, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play, Pause, Volume2, VolumeX, Volume1,
-  Maximize, Minimize, RotateCcw, RotateCw, Settings,
+  Maximize, Minimize, RotateCcw, RotateCw,
 } from 'lucide-react';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { formatDuration } from '../../utils/format';
@@ -11,63 +11,35 @@ import AudioModeOverlay from '../features/AudioModeOverlay';
 
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
-const QUALITY_LEVELS = [
-  { label: 'Auto',  height: null  },
-  { label: '1080p', height: 1080  },
-  { label: '720p',  height: 720   },
-  { label: '480p',  height: 480   },
-  { label: '360p',  height: 360   },
-  { label: '240p',  height: 240   },
-];
-
-/**
- * Given a Cloudinary video URL and a target height, return a transformed URL.
- * If height is null (Auto), return the original URL unchanged.
- */
-const buildQualityUrl = (originalUrl, height) => {
-  if (!height || !originalUrl) return originalUrl;
-  // Cloudinary URL pattern: .../upload/[transformations]/[version]/[public_id]
-  // Insert height + quality transformation after /upload/
-  if (originalUrl.includes('/upload/')) {
-    return originalUrl.replace(
-      '/upload/',
-      `/upload/h_${height},c_scale,q_auto/`
-    );
-  }
-  return originalUrl;
-};
-
 // ── Progress bar ──────────────────────────────────────────────────────────────
 const ProgressBar = ({ currentTime, duration, buffered, onSeek, onSeeking }) => {
-  const barRef = useRef(null);
   const [hovering, setHovering] = useState(false);
   const [hoverTime, setHoverTime] = useState(0);
   const [hoverX, setHoverX] = useState(0);
+  const barRef = useState(null);
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
   const getTimeFromEvent = (e) => {
-    const rect = barRef.current.getBoundingClientRect();
+    const rect = e.currentTarget.closest('[data-progressbar]').getBoundingClientRect();
     const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
     return { time: (x / rect.width) * duration, x };
   };
 
-  const handleClick = (e) => {
-    const { time } = getTimeFromEvent(e);
-    onSeek(time);
-  };
-
-  const handleMouseMove = (e) => {
-    const { time, x } = getTimeFromEvent(e);
-    setHoverTime(time);
-    setHoverX(x);
-    if (e.buttons === 1) {
-      onSeeking(true);
-      onSeek(time);
-    }
-  };
-
   return (
-    <div className="relative py-2 cursor-pointer" onMouseEnter={() => setHovering(true)} onMouseLeave={() => { setHovering(false); onSeeking(false); }}>
+    <div
+      data-progressbar
+      className="relative py-2 cursor-pointer"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => { setHovering(false); onSeeking(false); }}
+      onClick={(e) => { const { time } = getTimeFromEvent(e); onSeek(time); }}
+      onMouseMove={(e) => {
+        const { time, x } = getTimeFromEvent(e);
+        setHoverTime(time);
+        setHoverX(x);
+        if (e.buttons === 1) { onSeeking(true); onSeek(time); }
+      }}
+      onMouseUp={() => onSeeking(false)}
+    >
       {hovering && duration > 0 && (
         <div
           className="absolute bottom-full mb-2 -translate-x-1/2 bg-black/90 text-white text-xs font-medium px-2 py-1 rounded-md pointer-events-none whitespace-nowrap"
@@ -77,12 +49,8 @@ const ProgressBar = ({ currentTime, duration, buffered, onSeek, onSeeking }) => 
         </div>
       )}
       <div
-        ref={barRef}
         className="relative rounded-full overflow-hidden transition-all duration-150"
         style={{ height: hovering ? '5px' : '3px' }}
-        onClick={handleClick}
-        onMouseMove={handleMouseMove}
-        onMouseUp={() => onSeeking(false)}
         role="slider"
         aria-label="Video progress"
         aria-valuenow={Math.round(progress)}
@@ -120,7 +88,8 @@ const VolumeControl = ({ volume, muted, onToggleMute, onChangeVolume }) => {
         transition={{ duration: 0.2 }}
         className="overflow-hidden"
       >
-        <div className="relative h-1.5 bg-white/20 rounded-full cursor-pointer w-20 hover:h-2 transition-all"
+        <div
+          className="relative h-1.5 bg-white/20 rounded-full cursor-pointer w-20 hover:h-2 transition-all"
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             onChangeVolume(Math.max(0, Math.min(e.clientX - rect.left, rect.width)) / rect.width);
@@ -153,110 +122,45 @@ const SkipFeedback = ({ direction }) => (
   </motion.div>
 );
 
-// ── Settings menu (Speed + Quality) ──────────────────────────────────────────
-const SettingsMenu = ({ playbackRate, onRateChange, quality, onQualityChange }) => {
+// ── Speed menu ────────────────────────────────────────────────────────────────
+const SpeedMenu = ({ playbackRate, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [panel, setPanel] = useState('main'); // 'main' | 'speed' | 'quality'
-
-  const close = () => { setIsOpen(false); setPanel('main'); };
+  const close = () => setIsOpen(false);
 
   return (
     <div className="relative">
       <button
-        onClick={(e) => { e.stopPropagation(); setIsOpen((v) => !v); setPanel('main'); }}
-        className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-all"
-        aria-label="Settings"
+        onClick={(e) => { e.stopPropagation(); setIsOpen((v) => !v); }}
+        className="text-white/80 hover:text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-all"
+        aria-label="Playback speed"
       >
-        <Settings size={17} />
+        {playbackRate === 1 ? '1×' : `${playbackRate}×`}
       </button>
 
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Backdrop */}
             <div className="fixed inset-0 z-40" onClick={close} />
-
             <motion.div
               initial={{ opacity: 0, y: 8, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute bottom-full right-0 mb-2 z-50 min-w-[200px]"
+              className="absolute bottom-full right-0 mb-2 z-50 min-w-[100px]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="bg-[#1a1a1a]/98 backdrop-blur-lg border border-white/15 rounded-xl overflow-hidden shadow-2xl py-1.5">
-
-                {/* Main panel */}
-                {panel === 'main' && (
-                  <>
-                    <button
-                      onClick={() => setPanel('quality')}
-                      className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-white/80 hover:text-white hover:bg-white/8 transition-all"
-                    >
-                      <span className="font-medium">Quality</span>
-                      <span className="text-white/50 flex items-center gap-1">
-                        {quality.label}
-                        <span className="text-white/30 ml-1">›</span>
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => setPanel('speed')}
-                      className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-white/80 hover:text-white hover:bg-white/8 transition-all"
-                    >
-                      <span className="font-medium">Speed</span>
-                      <span className="text-white/50 flex items-center gap-1">
-                        {playbackRate === 1 ? 'Normal' : `${playbackRate}×`}
-                        <span className="text-white/30 ml-1">›</span>
-                      </span>
-                    </button>
-                  </>
-                )}
-
-                {/* Quality panel */}
-                {panel === 'quality' && (
-                  <>
-                    <button onClick={() => setPanel('main')} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-white/60 hover:text-white hover:bg-white/8 transition-all border-b border-white/8">
-                      <span className="text-white/40">‹</span>
-                      <span className="font-semibold text-white/80">Quality</span>
-                    </button>
-                    {QUALITY_LEVELS.map((q) => (
-                      <button
-                        key={q.label}
-                        onClick={() => { onQualityChange(q); close(); }}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 text-xs transition-all
-                          ${quality.label === q.label ? 'text-[#ff0000] bg-white/8' : 'text-white/70 hover:text-white hover:bg-white/8'}`}
-                      >
-                        <span className="font-medium">{q.label}</span>
-                        {quality.label === q.label && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000]" />
-                        )}
-                      </button>
-                    ))}
-                  </>
-                )}
-
-                {/* Speed panel */}
-                {panel === 'speed' && (
-                  <>
-                    <button onClick={() => setPanel('main')} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-white/60 hover:text-white hover:bg-white/8 transition-all border-b border-white/8">
-                      <span className="text-white/40">‹</span>
-                      <span className="font-semibold text-white/80">Speed</span>
-                    </button>
-                    {SPEEDS.map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => { onRateChange(s); close(); }}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 text-xs transition-all
-                          ${playbackRate === s ? 'text-[#ff0000] bg-white/8' : 'text-white/70 hover:text-white hover:bg-white/8'}`}
-                      >
-                        <span className="font-medium">{s === 1 ? 'Normal' : `${s}×`}</span>
-                        {playbackRate === s && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000]" />
-                        )}
-                      </button>
-                    ))}
-                  </>
-                )}
+                {SPEEDS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { onChange(s); close(); }}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 text-xs transition-all
+                      ${playbackRate === s ? 'text-[#ff0000] bg-white/8' : 'text-white/70 hover:text-white hover:bg-white/8'}`}
+                  >
+                    <span className="font-medium">{s === 1 ? 'Normal' : `${s}×`}</span>
+                    {playbackRate === s && <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000]" />}
+                  </button>
+                ))}
               </div>
             </motion.div>
           </>
@@ -278,10 +182,6 @@ const VideoPlayer = ({ src, poster, onTimeUpdate, onEnded, videoId, audioOnly = 
     handleContainerTap,
   } = useVideoPlayer();
 
-  // Quality state — only used for label display; actual src swap is imperative
-  const [quality, setQuality] = useState(QUALITY_LEVELS[0]);
-
-  // Flash animation state for center button feedback (YouTube-style)
   const [flashIcon, setFlashIcon] = useState(null);
 
   const handleTogglePlay = useCallback(() => {
@@ -289,31 +189,6 @@ const VideoPlayer = ({ src, poster, onTimeUpdate, onEnded, videoId, audioOnly = 
     setTimeout(() => setFlashIcon(null), 500);
     togglePlay();
   }, [playing, togglePlay]);
-
-  // YouTube-style quality change: swap src imperatively, restore time, resume
-  const handleQualityChange = useCallback((q) => {
-    const v = videoRef.current;
-    if (!v) return;
-
-    const savedTime = v.currentTime;
-    const wasPlaying = !v.paused;
-    const newSrc = buildQualityUrl(src, q.height);
-
-    setQuality(q);
-
-    // Swap src without React re-rendering the <video> element
-    v.src = newSrc;
-    v.load();
-
-    const onCanPlay = () => {
-      v.currentTime = savedTime;
-      if (wasPlaying) {
-        v.play().catch(() => {});
-      }
-      v.removeEventListener('canplay', onCanPlay);
-    };
-    v.addEventListener('canplay', onCanPlay);
-  }, [src, videoRef]);
 
   return (
     <div
@@ -324,7 +199,7 @@ const VideoPlayer = ({ src, poster, onTimeUpdate, onEnded, videoId, audioOnly = 
       onClick={(e) => handleContainerTap(e)}
       style={{ cursor: showControls ? 'default' : 'none' }}
     >
-      {/* Video */}
+      {/* Video element */}
       <video
         ref={videoRef}
         src={src}
@@ -382,7 +257,7 @@ const VideoPlayer = ({ src, poster, onTimeUpdate, onEnded, videoId, audioOnly = 
         )}
       </AnimatePresence>
 
-      {/* Persistent center play icon when paused */}
+      {/* Center play button when paused */}
       <AnimatePresence>
         {!playing && isReady && !flashIcon && (
           <motion.button
@@ -427,7 +302,7 @@ const VideoPlayer = ({ src, poster, onTimeUpdate, onEnded, videoId, audioOnly = 
               />
 
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                {/* Left controls */}
+                {/* Left */}
                 <div className="flex items-center gap-0.5">
                   <button
                     onClick={(e) => { e.stopPropagation(); handleTogglePlay(); }}
@@ -454,20 +329,9 @@ const VideoPlayer = ({ src, poster, onTimeUpdate, onEnded, videoId, audioOnly = 
                   </span>
                 </div>
 
-                {/* Right controls */}
+                {/* Right */}
                 <div className="flex items-center gap-0.5">
-                  {/* Quality badge */}
-                  <span className="text-white/50 text-[10px] font-semibold px-1.5">
-                    {quality.label}
-                  </span>
-
-                  {/* Settings (quality + speed) */}
-                  <SettingsMenu
-                    playbackRate={playbackRate}
-                    onRateChange={changePlaybackRate}
-                    quality={quality}
-                    onQualityChange={handleQualityChange}
-                  />
+                  <SpeedMenu playbackRate={playbackRate} onChange={changePlaybackRate} />
 
                   <button
                     onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}

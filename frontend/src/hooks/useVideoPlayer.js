@@ -61,7 +61,7 @@ export const useVideoPlayer = () => {
     const v = videoRef.current;
     if (!v) return;
     v.currentTime = time;
-    setCurrentTime(time);
+    setCurrentTime(time); // update immediately, don't wait for timeupdate
   }, []);
 
   const changeVolume = useCallback((val) => {
@@ -142,6 +142,8 @@ export const useVideoPlayer = () => {
     };
     const onCanPlay = () => setIsReady(true);
     const onEnded = () => { setPlaying(false); setShowControls(true); };
+    const onWaiting = () => setIsReady(false);
+    const onPlaying = () => setIsReady(true);
 
     v.addEventListener('timeupdate', onTimeUpdate);
     v.addEventListener('durationchange', onDurationChange);
@@ -151,6 +153,8 @@ export const useVideoPlayer = () => {
     v.addEventListener('progress', onProgress);
     v.addEventListener('canplay', onCanPlay);
     v.addEventListener('ended', onEnded);
+    v.addEventListener('waiting', onWaiting);
+    v.addEventListener('playing', onPlaying);
 
     return () => {
       v.removeEventListener('timeupdate', onTimeUpdate);
@@ -161,6 +165,8 @@ export const useVideoPlayer = () => {
       v.removeEventListener('progress', onProgress);
       v.removeEventListener('canplay', onCanPlay);
       v.removeEventListener('ended', onEnded);
+      v.removeEventListener('waiting', onWaiting);
+      v.removeEventListener('playing', onPlaying);
     };
   }, []);
 

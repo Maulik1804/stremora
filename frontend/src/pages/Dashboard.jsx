@@ -43,10 +43,10 @@ const MiniBarChart = ({ data = [], color = '#ff0000' }) => {
   );
 };
 
-// ── Video row in recent table ─────────────────────────────────────────────────
+// ── Video row in recent table (desktop) ──────────────────────────────────────
 const VideoRow = ({ video }) => (
   <tr className="border-b border-[#1f1f1f] hover:bg-[#1a1a1a] transition-colors">
-    <td className="py-3 pr-4">
+    <td className="py-3 pl-5 pr-4">
       <div className="flex items-center gap-3">
         <div className="w-20 aspect-video rounded-lg overflow-hidden bg-[#272727] flex-shrink-0">
           {video.thumbnailUrl && (
@@ -54,10 +54,7 @@ const VideoRow = ({ video }) => (
           )}
         </div>
         <div className="min-w-0">
-          <Link
-            to={`/watch/${video._id}`}
-            className="text-sm font-medium text-[#f1f1f1] hover:text-white line-clamp-1"
-          >
+          <Link to={`/watch/${video._id}`} className="text-sm font-medium text-[#f1f1f1] hover:text-white line-clamp-1">
             {video.title}
           </Link>
           <p className="text-xs text-[#606060] mt-0.5">{formatDistanceToNow(video.createdAt)}</p>
@@ -67,7 +64,7 @@ const VideoRow = ({ video }) => (
     <td className="py-3 pr-4 text-sm text-[#aaaaaa] tabular-nums">{formatCount(video.viewCount)}</td>
     <td className="py-3 pr-4 text-sm text-[#aaaaaa] tabular-nums">{formatCount(video.likeCount)}</td>
     <td className="py-3 pr-4 text-sm text-[#aaaaaa] tabular-nums">{formatCount(video.commentCount)}</td>
-    <td className="py-3">
+    <td className="py-3 pr-4">
       <span className={`px-2 py-0.5 rounded-full text-xs font-medium
         ${video.status === 'published' ? 'bg-green-900/40 text-green-400'
           : video.status === 'processing' ? 'bg-yellow-900/40 text-yellow-400'
@@ -76,15 +73,44 @@ const VideoRow = ({ video }) => (
         {video.status}
       </span>
     </td>
-    <td className="py-3">
-      <Link
-        to={`/studio/edit/${video._id}`}
-        className="text-xs text-[#3ea6ff] hover:underline"
-      >
-        Edit
-      </Link>
+    <td className="py-3 pr-5">
+      <Link to={`/studio/edit/${video._id}`} className="text-xs text-[#3ea6ff] hover:underline">Edit</Link>
     </td>
   </tr>
+);
+
+// ── Video card (mobile) ───────────────────────────────────────────────────────
+const VideoCard = ({ video }) => (
+  <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1f1f1f] last:border-0">
+    {/* Fixed-size thumbnail — 16:9 ratio, never squishes */}
+    <Link to={`/watch/${video._id}`} className="flex-shrink-0">
+      <div className="w-24 h-[54px] rounded-lg overflow-hidden bg-[#272727]">
+        {video.thumbnailUrl
+          ? <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" loading="lazy" />
+          : <div className="w-full h-full bg-[#272727]" />
+        }
+      </div>
+    </Link>
+    {/* Info */}
+    <div className="flex-1 min-w-0">
+      <Link to={`/watch/${video._id}`} className="text-sm font-medium text-[#f1f1f1] line-clamp-2 leading-snug">
+        {video.title}
+      </Link>
+      <div className="flex items-center gap-2 mt-1 text-xs text-[#606060] flex-wrap">
+        <span>{formatDistanceToNow(video.createdAt)}</span>
+        <span>·</span>
+        <span>{formatCount(video.viewCount)} views</span>
+        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium
+          ${video.status === 'published' ? 'bg-green-900/40 text-green-400'
+            : video.status === 'processing' ? 'bg-yellow-900/40 text-yellow-400'
+            : 'bg-red-900/40 text-red-400'}`}
+        >
+          {video.status}
+        </span>
+      </div>
+    </div>
+    <Link to={`/studio/edit/${video._id}`} className="text-xs text-[#3ea6ff] flex-shrink-0 hover:underline">Edit</Link>
+  </div>
 );
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -271,23 +297,31 @@ const Dashboard = () => {
             </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#1f1f1f] text-[#606060] text-xs uppercase tracking-wide">
-                  <th className="text-left px-5 py-3 font-medium">Video</th>
-                  <th className="text-left px-4 py-3 font-medium">Views</th>
-                  <th className="text-left px-4 py-3 font-medium">Likes</th>
-                  <th className="text-left px-4 py-3 font-medium">Comments</th>
-                  <th className="text-left px-4 py-3 font-medium">Status</th>
-                  <th className="text-left px-4 py-3 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentVideos.map((v) => <VideoRow key={v._id} video={v} />)}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Mobile: card list */}
+            <div className="md:hidden divide-y divide-[#1f1f1f]">
+              {recentVideos.map((v) => <VideoCard key={v._id} video={v} />)}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#1f1f1f] text-[#606060] text-xs uppercase tracking-wide">
+                    <th className="text-left px-5 py-3 font-medium">Video</th>
+                    <th className="text-left px-4 py-3 font-medium">Views</th>
+                    <th className="text-left px-4 py-3 font-medium">Likes</th>
+                    <th className="text-left px-4 py-3 font-medium">Comments</th>
+                    <th className="text-left px-4 py-3 font-medium">Status</th>
+                    <th className="text-left px-4 py-3 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentVideos.map((v) => <VideoRow key={v._id} video={v} />)}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>
