@@ -6,6 +6,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { PAGE_SIZE, cursorFilter, paginateResult } = require('../utils/pagination');
+const { createNotification } = require('./notification.controller');
 
 /**
  * GET /api/v1/comments?videoId=&cursor=&sort=
@@ -108,6 +109,36 @@ const createComment = asyncHandler(async (req, res) => {
 
   await Video.findByIdAndUpdate(videoId, { $inc: { commentCount: 1 } });
   await comment.populate('author', 'username displayName avatar');
+
+  // Send notifications (non-blocking)
+  setImmediate(async () => {
+    try {
+      const commenterName = req.user.displayName || req.user.username;
+      if (parentId && parent) {
+        // Reply — notify the parent comment's author
+        await createNotification({
+          recipient: parent.author,
+          type: 'new_reply',
+          actor: req.user._id,
+          resourceId: video._id,
+          resourceType: 'video',
+          message: `${commenterName} replied to your comment on "${video.title}"`,
+        });
+      } else {
+        // Top-level comment — notify the video owner
+        await createNotification({
+          recipient: video.owner,
+          type: 'new_comment',
+          actor: req.user._id,
+          resourceId: video._id,
+          resourceType: 'video',
+          message: `${commenterName} commented on your video "${video.title}"`,
+        });
+      }
+    } catch (err) {
+      console.error('[Notification] Failed to create comment notification:', err.message);
+    }
+  });
 
   return res.status(201).json(new ApiResponse(201, { comment }, 'Comment posted'));
 });

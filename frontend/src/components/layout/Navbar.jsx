@@ -6,9 +6,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { useSidebar } from '../../hooks/useSidebar';
 import { useSearchSuggestions } from '../../hooks/useSearchSuggestions';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
+import { useQuery } from '@tanstack/react-query';
 import Avatar from '../ui/Avatar';
 import SurpriseButton from '../features/SurpriseButton';
 import { formatCount } from '../../utils/format';
+import { engagementService } from '../../services/engagement.service';
 
 
 // ── Recent searches (localStorage) ───────────────────────────────────────────
@@ -221,22 +223,21 @@ const SearchBox = ({ onSearch, autoFocus = false, className = '' }) => {
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
 const Logo = () => (
-  <Link to="/" className="flex items-center gap-0.5 select-none group">
-    <motion.span
-      className="text-[#ff0000] font-black text-xl tracking-tight"
+  <Link to="/" className="flex items-center select-none group" aria-label="Streamora home">
+    <motion.img
+      src="/logo.png"
+      alt="Streamora"
+      className="h-8 w-auto object-contain mt-2"
       whileHover={{ scale: 1.04 }}
       transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-    >
-      Stream
-    </motion.span>
-    <span className="text-[#f0f0f0] font-black text-xl tracking-tight">ora</span>
+    />
   </Link>
 );
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
 const Navbar = () => {
   const { user, isAuthenticated } = useAuth();
-  const { toggle, toggleMobile, mobileOpen } = useSidebar();
+  const { toggle, toggleMobile } = useSidebar();
   const windowWidth = useWindowWidth();
   const handleMenuClick = () => windowWidth < 768 ? toggleMobile() : toggle();
   const navigate = useNavigate();
@@ -245,6 +246,16 @@ const Navbar = () => {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef(null);
+
+  // Poll unread notification count every 30 seconds when authenticated
+  const { data: unreadData } = useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: () => engagementService.getUnreadCount().then((r) => r.data.data.count),
+    enabled: isAuthenticated,
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+  });
+  const unreadCount = unreadData ?? 0;
 
   useEffect(() => {
     const handler = (e) => {
@@ -305,7 +316,13 @@ const Navbar = () => {
               <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
                 className="relative p-2 rounded-xl hover:bg-white/6 transition-colors" aria-label="Notifications">
                 <Bell size={19} className="text-[#f0f0f0]" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#ff0000] rounded-full ring-2 ring-[#080808]" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1
+                                   bg-[#ff0000] text-white text-[10px] font-bold rounded-full
+                                   flex items-center justify-center ring-2 ring-[#080808]">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </motion.button>
             </Link>
 
@@ -405,3 +422,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+

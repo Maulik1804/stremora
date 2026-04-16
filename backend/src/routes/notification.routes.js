@@ -4,6 +4,7 @@ const { Router } = require('express');
 const { param } = require('express-validator');
 const {
   getNotifications,
+  getUnreadCount,
   markRead,
   markAllRead,
   deleteNotification,
@@ -19,6 +20,7 @@ const validId = param('id').isMongoId().withMessage('Invalid id');
 router.use(verifyJWT);
 
 router.get('/', getNotifications);
+router.get('/unread-count', getUnreadCount);
 router.patch('/read-all', markAllRead);
 router.patch('/:id/read', [validId], validate, markRead);
 router.delete('/', clearAllNotifications);

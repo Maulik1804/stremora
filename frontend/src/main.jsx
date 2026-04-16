@@ -8,6 +8,9 @@ import { ToastProvider } from './components/ui/Toast';
 import App from './App';
 import './index.css';
 
+// Clear any stale focus-mode flag from previous sessions
+try { localStorage.removeItem('streamora_focus_mode'); } catch { /* ignore */ }
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

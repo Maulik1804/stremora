@@ -11,6 +11,8 @@ const {
   deleteAsset,
 } = require('../services/cloudinary.service');
 const { PAGE_SIZE, cursorFilter, paginateResult } = require('../utils/pagination');
+const { createNotification } = require('./notification.controller');
+const Subscription = require('../models/Subscription');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,6 +64,34 @@ const createVideo = asyncHandler(async (req, res) => {
     duration: videoData.duration,
     status: 'published',
   });
+
+  // Notify all subscribers about the new video (non-blocking)
+  if (visibility === 'public') {
+    setImmediate(async () => {
+      try {
+        const subs = await Subscription.find({
+          channel: req.user._id,
+          notificationPreference: { $ne: 'none' },
+        }).select('subscriber').lean();
+
+        const uploaderName = req.user.displayName || req.user.username;
+        await Promise.all(
+          subs.map((s) =>
+            createNotification({
+              recipient: s.subscriber,
+              type: 'new_video',
+              actor: req.user._id,
+              resourceId: video._id,
+              resourceType: 'video',
+              message: `${uploaderName} uploaded a new video: "${video.title}"`,
+            })
+          )
+        );
+      } catch (err) {
+        console.error('[Notification] Failed to notify subscribers:', err.message);
+      }
+    });
+  }
 
   return res.status(201).json(new ApiResponse(201, { video }, 'Video uploaded successfully'));
 });
@@ -592,6 +622,36 @@ const finalizeChunkedUpload = asyncHandler(async (req, res) => {
     });
 
     console.log(`[Upload] Video document created: ${video._id}`);
+
+    // Notify all subscribers about the new video (non-blocking)
+    if (session.visibility === 'public') {
+      setImmediate(async () => {
+        try {
+          const subs = await Subscription.find({
+            channel: session.userId,
+            notificationPreference: { $ne: 'none' },
+          }).select('subscriber').lean();
+
+          const uploader = await require('../models/User').findById(session.userId).select('displayName username').lean();
+          const uploaderName = uploader?.displayName || uploader?.username || 'Someone';
+
+          await Promise.all(
+            subs.map((s) =>
+              createNotification({
+                recipient: s.subscriber,
+                type: 'new_video',
+                actor: session.userId,
+                resourceId: video._id,
+                resourceType: 'video',
+                message: `${uploaderName} uploaded a new video: "${video.title}"`,
+              })
+            )
+          );
+        } catch (err) {
+          console.error('[Notification] Failed to notify subscribers (chunked):', err.message);
+        }
+      });
+    }
 
     // Clean up session
     delete global.uploadSessions[uploadSessionId];

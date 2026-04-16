@@ -217,9 +217,8 @@ export const MobileDrawer = () => {
           >
             {/* ── Header ── */}
             <div className="flex items-center justify-between px-4 h-14 border-b border-white/6 flex-shrink-0">
-              <Link to="/" onClick={close} className="flex items-center gap-0.5 select-none">
-                <span className="text-[#ff0000] font-black text-xl tracking-tight">Stream</span>
-                <span className="text-[#f0f0f0] font-black text-xl tracking-tight">ora</span>
+              <Link to="/" onClick={close} className="flex items-center select-none" aria-label="Streamora home">
+                <img src="/logo.png" alt="Streamora" className="h-8 w-auto object-contain" />
               </Link>
               <button
                 ref={closeButtonRef}
@@ -289,3 +288,4 @@ const Sidebar = () => (
 );
 
 export default Sidebar;
+

@@ -93,6 +93,19 @@ const clearAllNotifications = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /api/v1/notifications/unread-count
+ * Returns the count of unread notifications for the authenticated user.
+ * Requires: verifyJWT
+ */
+const getUnreadCount = asyncHandler(async (req, res) => {
+  const count = await Notification.countDocuments({
+    recipient: req.user._id,
+    isRead: false,
+  });
+  return res.status(200).json(new ApiResponse(200, { count }));
+});
+
+/**
  * Helper: create a notification (used internally by other controllers).
  * Not exposed as a route.
  */
@@ -117,6 +130,7 @@ const createNotification = async ({ recipient, type, actor, resourceId, resource
 
 module.exports = {
   getNotifications,
+  getUnreadCount,
   markRead,
   markAllRead,
   deleteNotification,

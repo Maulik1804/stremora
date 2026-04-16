@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import Navbar from '../components/layout/Navbar';
 import Sidebar from '../components/layout/Sidebar';
 import { selectSidebarExpanded, setSidebarExpanded } from '../store/slices/sidebarSlice';
-import { selectFocusMode } from '../store/slices/focusSlice';
+import { selectFocusMode, setFocusMode } from '../store/slices/focusSlice';
 import { useWindowWidth } from '../hooks/useWindowWidth';
 
 const pageVariants = {
@@ -25,6 +25,13 @@ const MainLayout = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [location.pathname]);
+
+  // Reset focus mode when navigating away from the watch page
+  useEffect(() => {
+    if (!location.pathname.startsWith('/watch')) {
+      dispatch(setFocusMode(false));
+    }
+  }, [location.pathname, dispatch]);
 
   // Collapse to icon-only on medium screens
   useEffect(() => {

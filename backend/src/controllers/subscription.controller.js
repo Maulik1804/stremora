@@ -5,6 +5,7 @@ const User = require('../models/User');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
+const { createNotification } = require('./notification.controller');
 
 /**
  * POST /api/v1/subscriptions/:channelId
@@ -32,6 +33,23 @@ const toggleSubscription = asyncHandler(async (req, res) => {
   } else {
     await Subscription.create({ subscriber: req.user._id, channel: channelId });
     subscribed = true;
+
+    // Notify channel owner about new subscriber (non-blocking)
+    setImmediate(async () => {
+      try {
+        const subscriberName = req.user.displayName || req.user.username;
+        await createNotification({
+          recipient: channelId,
+          type: 'new_subscriber',
+          actor: req.user._id,
+          resourceId: req.user._id,
+          resourceType: 'user',
+          message: `${subscriberName} subscribed to your channel`,
+        });
+      } catch (err) {
+        console.error('[Notification] Failed to create subscriber notification:', err.message);
+      }
+    });
   }
 
   const subscriberCount = await Subscription.countDocuments({ channel: channelId });

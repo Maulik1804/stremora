@@ -20,12 +20,23 @@ const NotificationItem = ({ notification, onRead }) => {
   const meta = TYPE_META[notification.type] ?? { icon: Bell, color: 'text-[#aaaaaa]', bg: 'bg-[#272727]' };
   const Icon = meta.icon;
 
-  return (
+  // Build link target based on notification type
+  const linkTo = notification.resourceType === 'video' && notification.resourceId
+    ? `/watch/${notification.resourceId}`
+    : notification.resourceType === 'user' && notification.resourceId
+    ? null   // new_subscriber — no specific page to link to
+    : null;
+
+  const handleClick = () => {
+    if (!notification.isRead) onRead(notification._id);
+  };
+
+  const content = (
     <motion.div
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.18 }}
-      onClick={() => !notification.isRead && onRead(notification._id)}
+      onClick={handleClick}
       className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-colors
         ${notification.isRead
           ? 'border-[#2a2a2a] bg-[#141414] hover:bg-[#1a1a1a]'
@@ -52,6 +63,8 @@ const NotificationItem = ({ notification, onRead }) => {
       )}
     </motion.div>
   );
+
+  return linkTo ? <Link to={linkTo}>{content}</Link> : content;
 };
 
 const Notifications = () => {
@@ -80,12 +93,18 @@ const Notifications = () => {
 
   const markReadMutation = useMutation({
     mutationFn: (id) => engagementService.markRead(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
   });
 
   const markAllMutation = useMutation({
     mutationFn: () => engagementService.markAllRead(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
   });
 
   const notifications = data?.pages.flatMap((p) => p.notifications) ?? [];
