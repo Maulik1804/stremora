@@ -4,10 +4,10 @@
   publish = "dist"
 
 # ── API proxy — forwards /api/* to the Cloudflare tunnel ─────────────────────
-# When the tunnel URL changes, update ONLY this line.
+# When the tunnel URL changes, update ONLY the "to" line below.
 [[redirects]]
   from = "/api/*"
-  to = "https://tuning-playlist-lawrence-oliver.trycloudflare.com/api/:splat"
+  to = "https://emacs-hair-deals-chapter.trycloudflare.com/api/:splat"
   status = 200
   force = true
 
