@@ -20,6 +20,8 @@ const {
   uploadChunk,
   finalizeChunkedUpload,
   getUploadStatus,
+  getUploadSignature,
+  saveVideo,
 } = require('../controllers/video.controller');
 
 const verifyJWT = require('../middlewares/auth.middleware');
@@ -46,7 +48,15 @@ router.get('/mine', verifyJWT, getMyVideos);
 // Public: all videos for a specific channel
 router.get('/channel/:userId', getChannelVideos);
 
-// Chunked upload routes
+// Direct Cloudinary upload (new approach — no tunnel timeout)
+router.get('/upload/signature', verifyJWT, getUploadSignature);
+router.post('/save', verifyJWT, [
+  body('title').trim().notEmpty().withMessage('Title is required'),
+  body('cloudinaryPublicId').notEmpty().withMessage('cloudinaryPublicId is required'),
+  body('videoUrl').notEmpty().withMessage('videoUrl is required'),
+], validate, saveVideo);
+
+// Legacy chunked upload routes (kept for backward compat)
 router.post('/upload/init', verifyJWT, [
   body('title').trim().notEmpty().withMessage('Title is required').isLength({ max: 100 }).withMessage('Title max 100 chars'),
   body('fileSize').isInt({ min: 1 }).withMessage('fileSize must be a positive integer'),

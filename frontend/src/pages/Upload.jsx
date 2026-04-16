@@ -122,6 +122,7 @@ const Upload = () => {
               <UploadProgress
                 progress={uploadProgress}
                 fileName={videoFile?.name}
+                onCancel={cancel}
               />
             </motion.div>
           )}

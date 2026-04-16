@@ -622,8 +622,6 @@ const finalizeChunkedUpload = asyncHandler(async (req, res) => {
  * POST /api/v1/videos/:id/view
  * Increment view count. Called by frontend after watch threshold.
  */
- * Returns the video once it exists in DB (processing or published).
- */
 const getUploadStatus = asyncHandler(async (req, res) => {
   const { uploadSessionId } = req.params;
 
@@ -671,6 +669,91 @@ const recordView = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, null, 'View recorded'));
 });
 
+/**
+ * GET /api/v1/videos/upload/signature
+ * Generate a signed Cloudinary upload signature for direct browser-to-Cloudinary upload.
+ * Requires: verifyJWT
+ */
+const getUploadSignature = asyncHandler(async (req, res) => {
+  const cloudinaryInstance = require('../config/cloudinary');
+  const { CLOUDINARY_API_KEY, CLOUDINARY_CLOUD_NAME } = require('../config/env');
+
+  const resourceType = req.query.resourceType || 'video';
+  const timestamp = Math.round(Date.now() / 1000);
+  const folder = resourceType === 'image' ? 'streamora/thumbnails' : 'streamora/videos';
+
+  const signature = cloudinaryInstance.utils.api_sign_request(
+    { timestamp, folder },
+    process.env.CLOUDINARY_API_SECRET
+  );
+
+  return res.status(200).json(new ApiResponse(200, {
+    signature,
+    timestamp,
+    folder,
+    apiKey: CLOUDINARY_API_KEY,
+    cloudName: CLOUDINARY_CLOUD_NAME,
+  }));
+});
+
+/**
+ * POST /api/v1/videos/save
+ * Save video metadata after direct Cloudinary upload from browser.
+ * Body: { title, description, visibility, tags, cloudinaryPublicId, videoUrl, thumbnailUrl, duration }
+ * Requires: verifyJWT
+ */
+const saveVideo = asyncHandler(async (req, res) => {
+  const {
+    title, description = '', visibility = 'public', tags,
+    cloudinaryPublicId, videoUrl, thumbnailUrl, duration,
+  } = req.body;
+
+  if (!title?.trim()) throw new ApiError(400, 'Title is required');
+  if (!cloudinaryPublicId || !videoUrl) throw new ApiError(400, 'Cloudinary upload data is required');
+
+  const parsedTags = tags
+    ? (Array.isArray(tags) ? tags : String(tags).split(',').map((t) => t.trim())).filter(Boolean).slice(0, 15)
+    : [];
+
+  const video = await Video.create({
+    owner: req.user._id,
+    title: title.trim(),
+    description,
+    visibility,
+    tags: parsedTags,
+    videoUrl,
+    cloudinaryPublicId,
+    thumbnailUrl: thumbnailUrl || '',
+    duration: Math.round(duration || 0),
+    status: 'published',
+  });
+
+  // Notify subscribers (non-blocking)
+  if (visibility === 'public') {
+    setImmediate(async () => {
+      try {
+        const subs = await Subscription.find({
+          channel: req.user._id,
+          notificationPreference: { $ne: 'none' },
+        }).select('subscriber').lean();
+        const uploaderName = req.user.displayName || req.user.username;
+        await Promise.all(subs.map((s) => createNotification({
+          recipient: s.subscriber,
+          type: 'new_video',
+          actor: req.user._id,
+          resourceId: video._id,
+          resourceType: 'video',
+          message: `${uploaderName} uploaded a new video: "${video.title}"`,
+        })));
+      } catch (err) {
+        console.error('[Notification] Failed:', err.message);
+      }
+    });
+  }
+
+  return res.status(201).json(new ApiResponse(201, { video }, 'Video saved successfully'));
+});
+
 module.exports = {
   createVideo,
   uploadThumbnail,
@@ -688,4 +771,6 @@ module.exports = {
   uploadChunk,
   finalizeChunkedUpload,
   getUploadStatus,
+  getUploadSignature,
+  saveVideo,
 };

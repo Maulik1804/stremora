@@ -108,7 +108,7 @@ export const useUpload = () => {
     setThumbnailPreview(null);
   }, [thumbnailPreview]);
 
-  // ── Upload with chunking ─────────────────────────────────────────────────
+  // ── Direct Cloudinary upload (new approach) ──────────────────────────────
 
   const upload = useCallback(async (formValues) => {
     if (!videoFile) return;
@@ -120,155 +120,118 @@ export const useUpload = () => {
     abortRef.current = controller;
 
     try {
-      // Chunk size: 5MB for faster uploads
-      const CHUNK_SIZE = 5 * 1024 * 1024;
-      const totalChunks = Math.ceil(videoFile.size / CHUNK_SIZE);
-      let uploadedBytes = 0;
+      // Step 1: Get signed upload credentials from our backend
+      console.log('[Upload] Getting upload signature...');
+      const sigRes = await videoService.getUploadSignature();
+      const { signature, timestamp, folder, apiKey, cloudName } = sigRes.data.data;
 
-      console.log(`[Upload] Starting chunked upload: ${videoFile.name} (${(videoFile.size / 1024 / 1024).toFixed(2)} MB, ${totalChunks} chunks)`);
+      // Step 2: Upload video directly to Cloudinary from browser
+      // This bypasses our tunnel entirely — goes straight to Cloudinary's CDN
+      console.log(`[Upload] Uploading directly to Cloudinary (${(videoFile.size / 1024 / 1024).toFixed(1)} MB)...`);
 
-      // Step 1: Initialize upload session
-      console.log('[Upload] Initializing upload session...');
-      const initRes = await videoService.initChunkedUpload({
-        fileName: videoFile.name,
-        fileSize: videoFile.size,
+      const formData = new FormData();
+      formData.append('file', videoFile);
+      formData.append('api_key', apiKey);
+      formData.append('timestamp', timestamp);
+      formData.append('signature', signature);
+      formData.append('folder', folder);
+      formData.append('resource_type', 'video');
+
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`;
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', cloudinaryUrl);
+
+      // Track real upload progress
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 90);
+          setUploadProgress(pct);
+        }
+      };
+
+      // Handle abort
+      controller.signal.addEventListener('abort', () => xhr.abort());
+
+      const cloudinaryResult = await new Promise((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.error?.message || `Cloudinary error ${xhr.status}`));
+            } catch {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.onabort = () => reject(new Error('Upload cancelled'));
+        xhr.send(formData);
+      });
+
+      console.log('[Upload] Cloudinary upload complete:', cloudinaryResult.public_id);
+      setUploadProgress(92);
+
+      // Step 3: Upload thumbnail to Cloudinary if provided
+      let thumbnailUrl = cloudinaryResult.eager?.[0]?.secure_url || '';
+
+      if (thumbnailFile) {
+        console.log('[Upload] Uploading thumbnail...');
+        try {
+          const thumbSigRes = await videoService.getUploadSignature('image');
+          const thumbSig = thumbSigRes.data.data;
+
+          const thumbFd = new FormData();
+          thumbFd.append('file', thumbnailFile);
+          thumbFd.append('api_key', thumbSig.apiKey);
+          thumbFd.append('timestamp', thumbSig.timestamp);
+          thumbFd.append('signature', thumbSig.signature);
+          thumbFd.append('folder', 'streamora/thumbnails');
+          thumbFd.append('resource_type', 'image');
+          thumbFd.append('transformation', 'w_1280,h_720,c_fill,q_auto');
+
+          const thumbRes = await fetch(
+            `https://api.cloudinary.com/v1_1/${thumbSig.cloudName}/image/upload`,
+            { method: 'POST', body: thumbFd }
+          );
+          const thumbData = await thumbRes.json();
+          if (thumbData.secure_url) {
+            thumbnailUrl = thumbData.secure_url;
+            console.log('[Upload] Thumbnail uploaded:', thumbnailUrl);
+          }
+        } catch (thumbErr) {
+          console.warn('[Upload] Thumbnail upload failed (non-fatal):', thumbErr.message);
+          // Use auto-generated thumbnail from video
+        }
+      }
+
+      setUploadProgress(96);
+
+      // Step 4: Save metadata to our backend (tiny request, no file transfer)
+      console.log('[Upload] Saving video metadata to backend...');
+      const saveRes = await videoService.saveVideo({
         title: formValues.title,
         description: formValues.description || '',
         visibility: formValues.visibility,
         tags: formValues.tags || '',
+        cloudinaryPublicId: cloudinaryResult.public_id,
+        videoUrl: cloudinaryResult.secure_url,
+        thumbnailUrl,
+        duration: cloudinaryResult.duration || 0,
       });
 
-      const uploadSessionId = initRes.data.data.uploadSessionId;
-      console.log(`[Upload] Session initialized: ${uploadSessionId}`);
-
-      // Step 2: Upload chunks
-      console.log(`[Upload] Uploading ${totalChunks} chunks...`);
-      for (let i = 0; i < totalChunks; i++) {
-        if (controller.signal.aborted) throw new Error('Upload cancelled');
-
-        const start = i * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, videoFile.size);
-        const chunk = videoFile.slice(start, end);
-
-        const chunkFd = new FormData();
-        chunkFd.append('chunk', chunk);
-        chunkFd.append('chunkIndex', i);
-        chunkFd.append('totalChunks', totalChunks);
-
-        try {
-          await videoService.uploadChunk(uploadSessionId, chunkFd);
-        } catch (chunkErr) {
-          console.error(`[Upload] Chunk ${i} failed:`, chunkErr.message);
-          
-          // Check if it's an auth error (token expired)
-          if (chunkErr.response?.status === 401) {
-            throw new Error('Your session has expired. Please log in again and retry the upload.');
-          }
-          
-          throw new Error(`Failed to upload chunk ${i + 1} of ${totalChunks}: ${chunkErr.response?.data?.message || chunkErr.message}`);
-        }
-
-        uploadedBytes += chunk.size;
-        // Show 0-90% progress during chunk upload
-        const progress = Math.round((uploadedBytes / videoFile.size) * 90);
-        setUploadProgress(progress);
-        console.log(`[Upload] Progress: ${progress}% (${i + 1}/${totalChunks} chunks)`);
-      }
-
-      // Step 3: Trigger finalize (fire-and-forget — don't wait for response)
-      // The tunnel/proxy may timeout but the backend will still process it
-      console.log('[Upload] Triggering finalize (fire-and-forget)...');
-      setUploadProgress(92);
-
-      let createdVideoId = null;
-
-      try {
-        // Try with a short timeout — if it succeeds great, if it 504s we still poll
-        const finalRes = await Promise.race([
-          videoService.finalizeChunkedUpload(uploadSessionId),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 15000)),
-        ]);
-        createdVideoId = finalRes.data.data.video?._id;
-        console.log(`[Upload] Finalize responded: video ${createdVideoId}`);
-      } catch (finalizeErr) {
-        // 504 or timeout — backend is still processing, we poll by session
-        console.log('[Upload] Finalize timed out (expected) — polling for video...');
-      }
-
-      setUploadProgress(95);
-
-      // Upload custom thumbnail if we already have the video ID
-      if (thumbnailFile && createdVideoId) {
-        try {
-          const tfd = new FormData();
-          tfd.append('thumbnail', thumbnailFile);
-          await videoService.uploadThumbnail(createdVideoId, tfd);
-          console.log('[Upload] Thumbnail uploaded');
-        } catch (thumbErr) {
-          console.warn('[Upload] Thumbnail upload failed (non-fatal):', thumbErr.message);
-        }
-      }
-
-      // Poll for the video to appear and become published
-      // Works whether finalize responded or timed out
-      console.log('[Upload] Polling for published video...');
-      let publishedVideo = null;
-      const maxAttempts = 72; // poll every 5s for up to 6 minutes
-
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        await new Promise((r) => setTimeout(r, 5000));
-        if (controller.signal.aborted) throw new Error('Upload cancelled');
-
-        try {
-          let v = null;
-
-          if (createdVideoId) {
-            // We know the video ID — poll it directly
-            const res = await videoService.getById(createdVideoId);
-            v = res.data.data.video;
-          } else {
-            // We don't have the ID yet — poll the session status endpoint
-            const res = await videoService.getUploadStatus(uploadSessionId);
-            v = res.data.data.video;
-            if (v?._id) createdVideoId = v._id;
-          }
-
-          console.log(`[Upload] Poll ${attempt + 1}: status = ${v?.status}`);
-
-          if (v?.status === 'published') {
-            publishedVideo = v;
-            // Upload thumbnail now if we didn't before
-            if (thumbnailFile && !publishedVideo.thumbnailPublicId) {
-              try {
-                const tfd = new FormData();
-                tfd.append('thumbnail', thumbnailFile);
-                await videoService.uploadThumbnail(publishedVideo._id, tfd);
-              } catch { /* non-fatal */ }
-            }
-            break;
-          }
-          if (v?.status === 'failed') {
-            throw new Error('Video processing failed. Please try uploading again.');
-          }
-        } catch (pollErr) {
-          if (pollErr.message.includes('processing failed')) throw pollErr;
-          console.warn(`[Upload] Poll ${attempt + 1} error (retrying):`, pollErr.message);
-        }
-
-        // Progress 95 → 99 during processing
-        setUploadProgress(Math.min(99, 95 + Math.floor((attempt / maxAttempts) * 4)));
-      }
-
-      if (!publishedVideo) {
-        throw new Error('Video is taking longer than expected. Check your Studio — it may have uploaded successfully.');
-      }
+      const savedVideo = saveRes.data.data.video;
+      console.log('[Upload] Video saved:', savedVideo._id);
 
       setUploadProgress(100);
-      setUploadedVideo(publishedVideo);
+      setUploadedVideo(savedVideo);
       setStep(UPLOAD_STEPS.SUCCESS);
-      console.log('[Upload] Upload completed successfully');
+      console.log('[Upload] Upload completed successfully!');
+
     } catch (err) {
-      if (err.name === 'CanceledError' || err.name === 'AbortError') {
+      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.message === 'Upload cancelled') {
         console.log('[Upload] Upload cancelled by user');
         return;
       }

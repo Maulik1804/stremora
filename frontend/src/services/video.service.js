@@ -36,15 +36,11 @@ export const videoService = {
       timeout: CHUNK_TIMEOUT,
     }),
 
-  // Finalize — short timeout, we poll if it 504s
-  finalizeChunkedUpload: (uploadSessionId) =>
-    api.post(`/videos/upload/${uploadSessionId}/finalize`, {}, {
-      timeout: 20000, // 20s — if tunnel cuts it, we fall back to polling
-    }),
+  // Direct Cloudinary upload (new approach — browser uploads directly to Cloudinary)
+  getUploadSignature: (resourceType = 'video') =>
+    api.get('/videos/upload/signature', { params: { resourceType }, timeout: 10000 }),
 
-  // Poll for video status by session ID (works even if finalize timed out)
-  getUploadStatus: (uploadSessionId) =>
-    api.get(`/videos/upload/${uploadSessionId}/status`, { timeout: 10000 }),
+  saveVideo: (data) => api.post('/videos/save', data, { timeout: 15000 }),
 
   update: (id, data) => api.patch(`/videos/${id}`, data),
   delete: (id) => api.delete(`/videos/${id}`),
