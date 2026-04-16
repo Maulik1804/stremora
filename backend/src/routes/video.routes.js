@@ -19,6 +19,7 @@ const {
   initChunkedUpload,
   uploadChunk,
   finalizeChunkedUpload,
+  getUploadStatus,
 } = require('../controllers/video.controller');
 
 const verifyJWT = require('../middlewares/auth.middleware');
@@ -52,8 +53,8 @@ router.post('/upload/init', verifyJWT, [
 ], validate, initChunkedUpload);
 
 router.post('/upload/:uploadSessionId/chunk', verifyJWT, uploadVideo.single('chunk'), handleUploadError, uploadChunk);
-
 router.post('/upload/:uploadSessionId/finalize', verifyJWT, finalizeChunkedUpload);
+router.get('/upload/:uploadSessionId/status', verifyJWT, getUploadStatus);
 
 // Upload (POST /)
 router.post(

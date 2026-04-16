@@ -622,6 +622,50 @@ const finalizeChunkedUpload = asyncHandler(async (req, res) => {
  * POST /api/v1/videos/:id/view
  * Increment view count. Called by frontend after watch threshold.
  */
+ * Returns the video once it exists in DB (processing or published).
+ */
+const getUploadStatus = asyncHandler(async (req, res) => {
+  const { uploadSessionId } = req.params;
+
+  // Check if session still exists (still processing chunks)
+  global.uploadSessions = global.uploadSessions || {};
+  const session = global.uploadSessions[uploadSessionId];
+
+  if (session) {
+    // Session still active — finalize hasn't been called yet or is in progress
+    return res.status(200).json(new ApiResponse(200, { video: null, status: 'pending' }));
+  }
+
+  // Session gone — look for the video by matching the session pattern in owner + recent creation
+  // We use the userId embedded in the sessionId: "userId_timestamp_random"
+  const parts = uploadSessionId.split('_');
+  if (parts.length < 2) {
+    return res.status(200).json(new ApiResponse(200, { video: null, status: 'pending' }));
+  }
+
+  const userId = parts[0];
+  const sessionTimestamp = parseInt(parts[1]);
+
+  if (!sessionTimestamp) {
+    return res.status(200).json(new ApiResponse(200, { video: null, status: 'pending' }));
+  }
+
+  // Find the most recent video created by this user around the session time (±5 min)
+  const video = await Video.findOne({
+    owner: userId,
+    createdAt: {
+      $gte: new Date(sessionTimestamp - 60000),   // 1 min before session
+      $lte: new Date(sessionTimestamp + 600000),  // 10 min after session
+    },
+    isDeleted: false,
+  }).sort({ createdAt: -1 }).lean();
+
+  if (!video) {
+    return res.status(200).json(new ApiResponse(200, { video: null, status: 'pending' }));
+  }
+
+  return res.status(200).json(new ApiResponse(200, { video, status: video.status }));
+});
 const recordView = asyncHandler(async (req, res) => {
   await Video.findByIdAndUpdate(req.params.id, { $inc: { viewCount: 1 } });
   return res.status(200).json(new ApiResponse(200, null, 'View recorded'));
@@ -643,4 +687,5 @@ module.exports = {
   initChunkedUpload,
   uploadChunk,
   finalizeChunkedUpload,
+  getUploadStatus,
 };

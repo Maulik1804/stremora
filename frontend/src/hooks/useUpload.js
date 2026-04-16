@@ -175,61 +175,92 @@ export const useUpload = () => {
         console.log(`[Upload] Progress: ${progress}% (${i + 1}/${totalChunks} chunks)`);
       }
 
-      // Step 3: Finalize upload — returns immediately with processing status
-      console.log('[Upload] Finalizing upload...');
+      // Step 3: Trigger finalize (fire-and-forget — don't wait for response)
+      // The tunnel/proxy may timeout but the backend will still process it
+      console.log('[Upload] Triggering finalize (fire-and-forget)...');
       setUploadProgress(92);
 
-      const finalRes = await videoService.finalizeChunkedUpload(uploadSessionId);
-      const createdVideo = finalRes.data.data.video;
-      console.log(`[Upload] Video record created: ${createdVideo._id} (status: ${createdVideo.status})`);
+      let createdVideoId = null;
+
+      try {
+        // Try with a short timeout — if it succeeds great, if it 504s we still poll
+        const finalRes = await Promise.race([
+          videoService.finalizeChunkedUpload(uploadSessionId),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 15000)),
+        ]);
+        createdVideoId = finalRes.data.data.video?._id;
+        console.log(`[Upload] Finalize responded: video ${createdVideoId}`);
+      } catch (finalizeErr) {
+        // 504 or timeout — backend is still processing, we poll by session
+        console.log('[Upload] Finalize timed out (expected) — polling for video...');
+      }
+
       setUploadProgress(95);
 
-      // Upload custom thumbnail if provided
-      if (thumbnailFile && createdVideo._id) {
-        console.log('[Upload] Uploading custom thumbnail...');
-        const tfd = new FormData();
-        tfd.append('thumbnail', thumbnailFile);
+      // Upload custom thumbnail if we already have the video ID
+      if (thumbnailFile && createdVideoId) {
         try {
-          await videoService.uploadThumbnail(createdVideo._id, tfd);
+          const tfd = new FormData();
+          tfd.append('thumbnail', thumbnailFile);
+          await videoService.uploadThumbnail(createdVideoId, tfd);
           console.log('[Upload] Thumbnail uploaded');
         } catch (thumbErr) {
           console.warn('[Upload] Thumbnail upload failed (non-fatal):', thumbErr.message);
         }
       }
 
-      // Poll for video to become published (Cloudinary upload happens in background)
-      console.log('[Upload] Waiting for video to be processed...');
-      let publishedVideo = createdVideo;
+      // Poll for the video to appear and become published
+      // Works whether finalize responded or timed out
+      console.log('[Upload] Polling for published video...');
+      let publishedVideo = null;
+      const maxAttempts = 72; // poll every 5s for up to 6 minutes
 
-      if (createdVideo.status === 'processing') {
-        const maxAttempts = 60; // poll for up to 5 minutes
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-          await new Promise((r) => setTimeout(r, 5000)); // wait 5s between polls
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((r) => setTimeout(r, 5000));
+        if (controller.signal.aborted) throw new Error('Upload cancelled');
 
-          if (controller.signal.aborted) throw new Error('Upload cancelled');
+        try {
+          let v = null;
 
-          try {
-            const statusRes = await videoService.getById(createdVideo._id);
-            const v = statusRes.data.data.video;
-            console.log(`[Upload] Poll ${attempt + 1}: status = ${v?.status}`);
-
-            if (v?.status === 'published') {
-              publishedVideo = v;
-              break;
-            }
-            if (v?.status === 'failed') {
-              throw new Error('Video processing failed on the server. Please try uploading again.');
-            }
-          } catch (pollErr) {
-            if (pollErr.message.includes('processing failed')) throw pollErr;
-            // Network error during poll — keep trying
-            console.warn('[Upload] Poll error (retrying):', pollErr.message);
+          if (createdVideoId) {
+            // We know the video ID — poll it directly
+            const res = await videoService.getById(createdVideoId);
+            v = res.data.data.video;
+          } else {
+            // We don't have the ID yet — poll the session status endpoint
+            const res = await videoService.getUploadStatus(uploadSessionId);
+            v = res.data.data.video;
+            if (v?._id) createdVideoId = v._id;
           }
 
-          // Update progress bar during processing (95 → 99)
-          const processingProgress = Math.min(99, 95 + Math.floor((attempt / maxAttempts) * 4));
-          setUploadProgress(processingProgress);
+          console.log(`[Upload] Poll ${attempt + 1}: status = ${v?.status}`);
+
+          if (v?.status === 'published') {
+            publishedVideo = v;
+            // Upload thumbnail now if we didn't before
+            if (thumbnailFile && !publishedVideo.thumbnailPublicId) {
+              try {
+                const tfd = new FormData();
+                tfd.append('thumbnail', thumbnailFile);
+                await videoService.uploadThumbnail(publishedVideo._id, tfd);
+              } catch { /* non-fatal */ }
+            }
+            break;
+          }
+          if (v?.status === 'failed') {
+            throw new Error('Video processing failed. Please try uploading again.');
+          }
+        } catch (pollErr) {
+          if (pollErr.message.includes('processing failed')) throw pollErr;
+          console.warn(`[Upload] Poll ${attempt + 1} error (retrying):`, pollErr.message);
         }
+
+        // Progress 95 → 99 during processing
+        setUploadProgress(Math.min(99, 95 + Math.floor((attempt / maxAttempts) * 4)));
+      }
+
+      if (!publishedVideo) {
+        throw new Error('Video is taking longer than expected. Check your Studio — it may have uploaded successfully.');
       }
 
       setUploadProgress(100);
