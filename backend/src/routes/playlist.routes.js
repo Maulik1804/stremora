@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 
 const {
   createPlaylist,
@@ -13,8 +13,15 @@ const {
   removeVideoFromPlaylist,
   reorderPlaylist,
   addCollaborator,
+  acceptCollabInvite,
+  declineCollabInvite,
   removeCollaborator,
   getCollaborators,
+  getPendingInvites,
+  proposeCollabVideo,
+  approveCollabVideo,
+  rejectCollabVideo,
+  getCollabVideoRequests,
   getCollaborativePlaylists,
   createSeries,
   getMySeries,
@@ -30,6 +37,7 @@ const router = Router();
 // ── Static routes MUST come before /:id ──────────────────────────────────────
 router.get('/me', verifyJWT, getMyPlaylists);
 router.get('/collaborative', verifyJWT, getCollaborativePlaylists);
+router.get('/invites/pending', verifyJWT, getPendingInvites);
 
 // ── Series routes ─────────────────────────────────────────────────────────────
 router.post(
@@ -77,11 +85,21 @@ router.patch('/:id/series-thumbnail', verifyJWT, [
   body('thumbnailUrl').optional().isURL().withMessage('Invalid URL'),
 ], validate, updateSeriesThumbnail);
 
-// Collaborators
+// Collaborators — invite flow
 router.get('/:id/collaborators', verifyJWT, getCollaborators);
 router.post('/:id/collaborators', verifyJWT, [
   body('usernameOrEmail').trim().notEmpty().withMessage('usernameOrEmail is required'),
 ], validate, addCollaborator);
+router.post('/:id/collaborators/accept', verifyJWT, acceptCollabInvite);
+router.post('/:id/collaborators/decline', verifyJWT, declineCollabInvite);
 router.delete('/:id/collaborators/:userId', verifyJWT, removeCollaborator);
+
+// Collab video requests
+router.get('/:id/collab-video/requests', verifyJWT, getCollabVideoRequests);
+router.post('/:id/collab-video', verifyJWT, [
+  body('videoId').notEmpty().withMessage('videoId is required'),
+], validate, proposeCollabVideo);
+router.patch('/:id/collab-video/:videoId/approve', verifyJWT, approveCollabVideo);
+router.patch('/:id/collab-video/:videoId/reject', verifyJWT, rejectCollabVideo);
 
 module.exports = router;

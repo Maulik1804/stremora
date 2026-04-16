@@ -38,6 +38,7 @@ const EditVideo = lazy(() => import('./pages/EditVideo'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Series = lazy(() => import('./pages/Series'));
 const ChannelPlaylistDetail = lazy(() => import('./pages/ChannelPlaylistDetail'));
+const CollabInvites = lazy(() => import('./pages/CollabInvites'));
 
 // ── Admin sub-pages ───────────────────────────────────────────────────────────
 const AdminDashboard    = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -103,6 +104,7 @@ const App = () => {
           <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
           <Route path="/studio/edit/:id" element={<ProtectedRoute><EditVideo /></ProtectedRoute>} />
           <Route path="/series" element={<ProtectedRoute><Series /></ProtectedRoute>} />
+          <Route path="/collab-invites" element={<ProtectedRoute><CollabInvites /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

@@ -44,6 +44,24 @@ const playlistSchema = new mongoose.Schema(
       },
     ],
 
+    // Pending collaborator invites (awaiting approval)
+    pendingCollaborators: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        invitedAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    // Collab video upload requests (videos proposed by collaborators, need owner approval)
+    collabVideoRequests: [
+      {
+        video: { type: mongoose.Schema.Types.ObjectId, ref: 'Video' },
+        proposedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+        requestedAt: { type: Date, default: Date.now },
+      },
+    ],
+
     // ── Series ────────────────────────────────────────────────────────────────
     // When isSeries=true this playlist is a creator-managed series (like a TV show).
     // seriesThumbnail is auto-set to the first episode's thumbnail but can be overridden.

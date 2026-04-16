@@ -151,40 +151,116 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/v1/playlists/:id/collaborators
- * Add a collaborator by username or email. Owner only. Requires: verifyJWT
+ * Invite a collaborator by username or email. Owner only. Requires: verifyJWT
  * Body: { usernameOrEmail }
+ * — Sends a notification to the invitee; they must accept before being added.
  */
 const addCollaborator = asyncHandler(async (req, res) => {
   const { usernameOrEmail } = req.body;
   if (!usernameOrEmail) throw new ApiError(400, 'usernameOrEmail is required');
 
-  const playlist = await Playlist.findOne({ _id: req.params.id });
+  const playlist = await Playlist.findOne({ _id: req.params.id })
+    .populate('owner', 'username displayName');
   if (!playlist) throw new ApiError(404, 'Playlist not found');
-  if (!playlist.owner.equals(req.user._id)) throw new ApiError(403, 'Only the owner can add collaborators');
+  if (!playlist.owner._id.equals(req.user._id)) throw new ApiError(403, 'Only the owner can invite collaborators');
 
-  const collaboratorUser = await User.findOne({
+  const invitee = await User.findOne({
     $or: [
       { username: usernameOrEmail.toLowerCase() },
       { email: usernameOrEmail.toLowerCase() },
     ],
   }).select('_id username displayName avatar');
 
-  if (!collaboratorUser) throw new ApiError(404, 'User not found');
-  if (collaboratorUser._id.equals(req.user._id)) throw new ApiError(400, 'Cannot add yourself as collaborator');
+  if (!invitee) throw new ApiError(404, 'User not found');
+  if (invitee._id.equals(req.user._id)) throw new ApiError(400, 'Cannot invite yourself');
 
-  if (playlist.collaborators.some((c) => c.equals(collaboratorUser._id))) {
+  if (playlist.collaborators.some((c) => c.equals(invitee._id))) {
     throw new ApiError(409, 'User is already a collaborator');
   }
+  if (playlist.pendingCollaborators.some((p) => p.user.equals(invitee._id))) {
+    throw new ApiError(409, 'Invite already sent to this user');
+  }
 
-  playlist.collaborators.push(collaboratorUser._id);
+  playlist.pendingCollaborators.push({ user: invitee._id });
   await playlist.save();
 
-  return res.status(200).json(new ApiResponse(200, { collaborator: collaboratorUser }, 'Collaborator added'));
+  // Notify the invitee
+  const { createNotification } = require('./notification.controller');
+  await createNotification({
+    recipient: invitee._id,
+    type: 'collab_invite',
+    actor: req.user._id,
+    resourceId: playlist._id,
+    resourceType: 'playlist',
+    message: `${playlist.owner.displayName || playlist.owner.username} invited you to collaborate on "${playlist.title}"`,
+  });
+
+  return res.status(200).json(new ApiResponse(200, { invitee }, 'Invite sent'));
+});
+
+/**
+ * POST /api/v1/playlists/:id/collaborators/accept
+ * Accept a collaboration invite. Requires: verifyJWT (invitee only)
+ */
+const acceptCollabInvite = asyncHandler(async (req, res) => {
+  const playlist = await Playlist.findOne({ _id: req.params.id })
+    .populate('owner', 'username displayName');
+  if (!playlist) throw new ApiError(404, 'Playlist not found');
+
+  const pendingIdx = playlist.pendingCollaborators.findIndex((p) => p.user.equals(req.user._id));
+  if (pendingIdx === -1) throw new ApiError(404, 'No pending invite found');
+
+  // Move from pending → active collaborators
+  playlist.pendingCollaborators.splice(pendingIdx, 1);
+  playlist.collaborators.push(req.user._id);
+  await playlist.save();
+
+  // Notify the owner
+  const { createNotification } = require('./notification.controller');
+  await createNotification({
+    recipient: playlist.owner._id,
+    type: 'collab_invite_accepted',
+    actor: req.user._id,
+    resourceId: playlist._id,
+    resourceType: 'playlist',
+    message: `${req.user.displayName || req.user.username} accepted your collaboration invite for "${playlist.title}"`,
+  });
+
+  return res.status(200).json(new ApiResponse(200, null, 'Invite accepted'));
+});
+
+/**
+ * POST /api/v1/playlists/:id/collaborators/decline
+ * Decline a collaboration invite. Requires: verifyJWT (invitee only)
+ */
+const declineCollabInvite = asyncHandler(async (req, res) => {
+  const playlist = await Playlist.findOne({ _id: req.params.id })
+    .populate('owner', 'username displayName');
+  if (!playlist) throw new ApiError(404, 'Playlist not found');
+
+  const pendingIdx = playlist.pendingCollaborators.findIndex((p) => p.user.equals(req.user._id));
+  if (pendingIdx === -1) throw new ApiError(404, 'No pending invite found');
+
+  playlist.pendingCollaborators.splice(pendingIdx, 1);
+  await playlist.save();
+
+  // Notify the owner
+  const { createNotification } = require('./notification.controller');
+  await createNotification({
+    recipient: playlist.owner._id,
+    type: 'collab_invite_declined',
+    actor: req.user._id,
+    resourceId: playlist._id,
+    resourceType: 'playlist',
+    message: `${req.user.displayName || req.user.username} declined your collaboration invite for "${playlist.title}"`,
+  });
+
+  return res.status(200).json(new ApiResponse(200, null, 'Invite declined'));
 });
 
 /**
  * DELETE /api/v1/playlists/:id/collaborators/:userId
- * Remove a collaborator. Owner only. Requires: verifyJWT
+ * Remove a collaborator or cancel a pending invite. Owner only. Requires: verifyJWT
  */
 const removeCollaborator = asyncHandler(async (req, res) => {
   const playlist = await Playlist.findOne({ _id: req.params.id });
@@ -192,6 +268,7 @@ const removeCollaborator = asyncHandler(async (req, res) => {
   if (!playlist.owner.equals(req.user._id)) throw new ApiError(403, 'Only the owner can remove collaborators');
 
   playlist.collaborators = playlist.collaborators.filter((c) => !c.equals(req.params.userId));
+  playlist.pendingCollaborators = playlist.pendingCollaborators.filter((p) => !p.user.equals(req.params.userId));
   await playlist.save();
 
   return res.status(200).json(new ApiResponse(200, null, 'Collaborator removed'));
@@ -199,16 +276,177 @@ const removeCollaborator = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/v1/playlists/:id/collaborators
- * Get collaborators list. Requires: verifyJWT (owner only)
+ * Get collaborators list (active + pending). Requires: verifyJWT (owner only)
  */
 const getCollaborators = asyncHandler(async (req, res) => {
   const playlist = await Playlist.findOne({ _id: req.params.id })
-    .populate('collaborators', 'username displayName avatar');
+    .populate('collaborators', 'username displayName avatar')
+    .populate('pendingCollaborators.user', 'username displayName avatar');
 
   if (!playlist) throw new ApiError(404, 'Playlist not found');
   if (!playlist.owner.equals(req.user._id)) throw new ApiError(403, 'Forbidden');
 
-  return res.status(200).json(new ApiResponse(200, { collaborators: playlist.collaborators }));
+  return res.status(200).json(new ApiResponse(200, {
+    collaborators: playlist.collaborators,
+    pendingCollaborators: playlist.pendingCollaborators,
+  }));
+});
+
+/**
+ * GET /api/v1/playlists/invites/pending
+ * Get all pending collab invites for the current user. Requires: verifyJWT
+ */
+const getPendingInvites = asyncHandler(async (req, res) => {
+  const playlists = await Playlist.find({
+    'pendingCollaborators.user': req.user._id,
+  })
+    .populate('owner', 'username displayName avatar')
+    .select('title description owner pendingCollaborators')
+    .lean();
+
+  return res.status(200).json(new ApiResponse(200, { invites: playlists }));
+});
+
+/**
+ * POST /api/v1/playlists/:id/collab-video
+ * Collaborator proposes a video to be added to the playlist.
+ * Owner gets a notification to approve/reject. Requires: verifyJWT (collaborator)
+ * Body: { videoId }
+ */
+const proposeCollabVideo = asyncHandler(async (req, res) => {
+  const { videoId } = req.body;
+  if (!videoId) throw new ApiError(400, 'videoId is required');
+
+  const playlist = await Playlist.findOne({ _id: req.params.id })
+    .populate('owner', 'username displayName');
+  if (!playlist) throw new ApiError(404, 'Playlist not found');
+
+  const isCollaborator = playlist.collaborators.some((c) => c.equals(req.user._id));
+  const isOwner = playlist.owner._id.equals(req.user._id);
+  if (!isCollaborator && !isOwner) throw new ApiError(403, 'Only collaborators can propose videos');
+
+  // Owner can add directly without approval
+  if (isOwner) {
+    const video = await Video.findOne({ _id: videoId, isDeleted: false });
+    if (!video) throw new ApiError(404, 'Video not found');
+    if (playlist.videos.some((v) => v.equals(videoId))) throw new ApiError(409, 'Video already in playlist');
+    playlist.videos.push(videoId);
+    await playlist.save();
+    return res.status(200).json(new ApiResponse(200, null, 'Video added'));
+  }
+
+  const video = await Video.findOne({ _id: videoId, isDeleted: false });
+  if (!video) throw new ApiError(404, 'Video not found');
+
+  // Check not already in playlist or pending
+  if (playlist.videos.some((v) => v.equals(videoId))) throw new ApiError(409, 'Video already in playlist');
+  const alreadyPending = playlist.collabVideoRequests.some(
+    (r) => r.video.equals(videoId) && r.status === 'pending'
+  );
+  if (alreadyPending) throw new ApiError(409, 'Video already pending approval');
+
+  playlist.collabVideoRequests.push({ video: videoId, proposedBy: req.user._id });
+  await playlist.save();
+
+  // Notify the owner
+  const { createNotification } = require('./notification.controller');
+  await createNotification({
+    recipient: playlist.owner._id,
+    type: 'collab_video_request',
+    actor: req.user._id,
+    resourceId: playlist._id,
+    resourceType: 'playlist',
+    message: `${req.user.displayName || req.user.username} proposed a video for "${playlist.title}" — review it in your playlist`,
+  });
+
+  return res.status(200).json(new ApiResponse(200, null, 'Video proposed for approval'));
+});
+
+/**
+ * PATCH /api/v1/playlists/:id/collab-video/:videoId/approve
+ * Owner approves a collab video request. Requires: verifyJWT (owner only)
+ */
+const approveCollabVideo = asyncHandler(async (req, res) => {
+  const playlist = await Playlist.findOne({ _id: req.params.id });
+  if (!playlist) throw new ApiError(404, 'Playlist not found');
+  if (!playlist.owner.equals(req.user._id)) throw new ApiError(403, 'Only the owner can approve');
+
+  const request = playlist.collabVideoRequests.find(
+    (r) => r.video.equals(req.params.videoId) && r.status === 'pending'
+  );
+  if (!request) throw new ApiError(404, 'Request not found');
+
+  request.status = 'approved';
+  if (!playlist.videos.some((v) => v.equals(req.params.videoId))) {
+    playlist.videos.push(req.params.videoId);
+  }
+  await playlist.save();
+
+  // Notify the proposer
+  const { createNotification } = require('./notification.controller');
+  await createNotification({
+    recipient: request.proposedBy,
+    type: 'collab_video_approved',
+    actor: req.user._id,
+    resourceId: playlist._id,
+    resourceType: 'playlist',
+    message: `Your video was approved and added to "${playlist.title}"`,
+  });
+
+  return res.status(200).json(new ApiResponse(200, null, 'Video approved and added'));
+});
+
+/**
+ * PATCH /api/v1/playlists/:id/collab-video/:videoId/reject
+ * Owner rejects a collab video request. Requires: verifyJWT (owner only)
+ */
+const rejectCollabVideo = asyncHandler(async (req, res) => {
+  const playlist = await Playlist.findOne({ _id: req.params.id });
+  if (!playlist) throw new ApiError(404, 'Playlist not found');
+  if (!playlist.owner.equals(req.user._id)) throw new ApiError(403, 'Only the owner can reject');
+
+  const request = playlist.collabVideoRequests.find(
+    (r) => r.video.equals(req.params.videoId) && r.status === 'pending'
+  );
+  if (!request) throw new ApiError(404, 'Request not found');
+
+  request.status = 'rejected';
+  await playlist.save();
+
+  // Notify the proposer
+  const { createNotification } = require('./notification.controller');
+  await createNotification({
+    recipient: request.proposedBy,
+    type: 'collab_video_rejected',
+    actor: req.user._id,
+    resourceId: playlist._id,
+    resourceType: 'playlist',
+    message: `Your video proposal for "${playlist.title}" was not approved`,
+  });
+
+  return res.status(200).json(new ApiResponse(200, null, 'Video request rejected'));
+});
+
+/**
+ * GET /api/v1/playlists/:id/collab-video/requests
+ * Get pending collab video requests for a playlist. Owner only. Requires: verifyJWT
+ */
+const getCollabVideoRequests = asyncHandler(async (req, res) => {
+  const playlist = await Playlist.findOne({ _id: req.params.id })
+    .populate({
+      path: 'collabVideoRequests.video',
+      match: { isDeleted: false },
+      select: 'title thumbnailUrl duration viewCount owner',
+      populate: { path: 'owner', select: 'username displayName avatar' },
+    })
+    .populate('collabVideoRequests.proposedBy', 'username displayName avatar');
+
+  if (!playlist) throw new ApiError(404, 'Playlist not found');
+  if (!playlist.owner.equals(req.user._id)) throw new ApiError(403, 'Forbidden');
+
+  const pending = playlist.collabVideoRequests.filter((r) => r.status === 'pending');
+
+  return res.status(200).json(new ApiResponse(200, { requests: pending }));
 });
 
 /**
@@ -338,8 +576,15 @@ module.exports = {
   removeVideoFromPlaylist,
   reorderPlaylist,
   addCollaborator,
+  acceptCollabInvite,
+  declineCollabInvite,
   removeCollaborator,
   getCollaborators,
+  getPendingInvites,
+  proposeCollabVideo,
+  approveCollabVideo,
+  rejectCollabVideo,
+  getCollabVideoRequests,
   getCollaborativePlaylists,
   createSeries,
   getMySeries,

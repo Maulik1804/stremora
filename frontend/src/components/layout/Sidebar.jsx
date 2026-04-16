@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Compass, PlaySquare, ThumbsUp, ListVideo,
   Bell, History, LayoutDashboard, Settings, Clapperboard,
-  TrendingUp, Target, X, LogIn, Film,
+  TrendingUp, Target, X, LogIn, Film, Users,
 } from 'lucide-react';
 import { useSidebar } from '../../hooks/useSidebar';
 import { useAuth } from '../../hooks/useAuth';
@@ -18,12 +18,13 @@ const NAV_PUBLIC = [
 ];
 
 const NAV_AUTH = [
-  { icon: PlaySquare, label: 'Subscriptions', to: '/subscriptions' },
-  { icon: History,    label: 'History',       to: '/history' },
-  { icon: ThumbsUp,   label: 'Liked',         to: '/liked' },
-  { icon: ListVideo,  label: 'Playlists',     to: '/playlists' },
-  { icon: Target,     label: 'Goals',         to: '/goals' },
-  { icon: Bell,       label: 'Notifications', to: '/notifications' },
+  { icon: PlaySquare, label: 'Subscriptions',    to: '/subscriptions' },
+  { icon: History,    label: 'History',          to: '/history' },
+  { icon: ThumbsUp,   label: 'Liked',            to: '/liked' },
+  { icon: ListVideo,  label: 'Playlists',        to: '/playlists' },
+  { icon: Users,      label: 'Collab Invites',   to: '/collab-invites' },
+  { icon: Target,     label: 'Goals',            to: '/goals' },
+  { icon: Bell,       label: 'Notifications',    to: '/notifications' },
 ];
 
 const NAV_CREATOR = [

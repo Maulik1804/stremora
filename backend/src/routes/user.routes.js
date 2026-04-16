@@ -13,6 +13,7 @@ const {
   removeAvatar,
   removeBanner,
   deleteAccount,
+  searchUsers,
 } = require('../controllers/user.controller');
 
 const verifyJWT = require('../middlewares/auth.middleware');
@@ -59,6 +60,9 @@ router.post('/me/banner', verifyJWT, uploadBanner.single('banner'), handleUpload
 router.delete('/me/banner', verifyJWT, removeBanner);
 
 router.delete('/me', verifyJWT, deleteAccount);
+
+// ── User search (autocomplete for collaborators etc.) — BEFORE /:username ─────
+router.get('/search', verifyJWT, searchUsers);
 
 // ── Public channel profile — AFTER /me routes ─────────────────────────────────
 router.get('/:username', optionalJWT, getChannelProfile);

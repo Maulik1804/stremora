@@ -9,11 +9,17 @@ import { engagementService } from '../services/engagement.service';
 import { formatDistanceToNow } from '../utils/date';
 
 const TYPE_META = {
-  new_video:          { icon: PlaySquare,    color: 'text-[#ff0000]',    bg: 'bg-[#ff0000]/10' },
-  new_comment:        { icon: MessageSquare, color: 'text-[#3ea6ff]',    bg: 'bg-[#3ea6ff]/10' },
-  new_reply:          { icon: MessageSquare, color: 'text-[#3ea6ff]',    bg: 'bg-[#3ea6ff]/10' },
-  new_subscriber:     { icon: Users,         color: 'text-green-400',    bg: 'bg-green-900/20' },
-  membership_purchase:{ icon: Star,          color: 'text-yellow-400',   bg: 'bg-yellow-900/20' },
+  new_video:              { icon: PlaySquare,    color: 'text-[#ff0000]',    bg: 'bg-[#ff0000]/10' },
+  new_comment:            { icon: MessageSquare, color: 'text-[#3ea6ff]',    bg: 'bg-[#3ea6ff]/10' },
+  new_reply:              { icon: MessageSquare, color: 'text-[#3ea6ff]',    bg: 'bg-[#3ea6ff]/10' },
+  new_subscriber:         { icon: Users,         color: 'text-green-400',    bg: 'bg-green-900/20' },
+  membership_purchase:    { icon: Star,          color: 'text-yellow-400',   bg: 'bg-yellow-900/20' },
+  collab_invite:          { icon: Users,         color: 'text-[#3ea6ff]',    bg: 'bg-[#3ea6ff]/10' },
+  collab_invite_accepted: { icon: Users,         color: 'text-green-400',    bg: 'bg-green-900/20' },
+  collab_invite_declined: { icon: Users,         color: 'text-[#aaaaaa]',    bg: 'bg-[#272727]' },
+  collab_video_request:   { icon: PlaySquare,    color: 'text-yellow-400',   bg: 'bg-yellow-900/20' },
+  collab_video_approved:  { icon: PlaySquare,    color: 'text-green-400',    bg: 'bg-green-900/20' },
+  collab_video_rejected:  { icon: PlaySquare,    color: 'text-red-400',      bg: 'bg-red-900/20' },
 };
 
 const NotificationItem = ({ notification, onRead }) => {
@@ -23,8 +29,10 @@ const NotificationItem = ({ notification, onRead }) => {
   // Build link target based on notification type
   const linkTo = notification.resourceType === 'video' && notification.resourceId
     ? `/watch/${notification.resourceId}`
-    : notification.resourceType === 'user' && notification.resourceId
-    ? null   // new_subscriber — no specific page to link to
+    : notification.resourceType === 'playlist' && notification.resourceId
+    ? (notification.type === 'collab_invite'
+        ? `/collab-invites`
+        : `/playlists/${notification.resourceId}`)
     : null;
 
   const handleClick = () => {

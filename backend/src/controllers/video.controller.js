@@ -171,13 +171,41 @@ const getVideoById = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/v1/videos
- * Public feed — paginated, public published videos.
+ * Public feed — randomized like YouTube home page.
+ * First page: random sample. Subsequent pages: cursor-based newest-first fallback.
  * Query: cursor, limit
  */
 const getAllVideos = asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || PAGE_SIZE, 50);
   const cursor = req.query.cursor;
 
+  // First page — return a random sample for YouTube-like discovery
+  if (!cursor) {
+    const baseFilter = {
+      status: 'published',
+      visibility: 'public',
+      isDeleted: false,
+    };
+
+    const docs = await Video.aggregate([
+      { $match: baseFilter },
+      { $sample: { size: limit } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'owner',
+          foreignField: '_id',
+          as: 'owner',
+          pipeline: [{ $project: { username: 1, displayName: 1, avatar: 1 } }],
+        },
+      },
+      { $unwind: '$owner' },
+    ]);
+
+    return res.status(200).json(new ApiResponse(200, { videos: docs, nextCursor: null, hasMore: false }));
+  }
+
+  // Subsequent pages — cursor-based pagination (newest first)
   const filter = {
     status: 'published',
     visibility: 'public',

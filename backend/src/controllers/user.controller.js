@@ -253,6 +253,32 @@ const deleteAccount = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, null, 'Account deleted successfully'));
 });
 
+/**
+ * GET /api/v1/users/search?q=...
+ * Search users by username or displayName (case-insensitive, partial match).
+ * Requires: verifyJWT
+ */
+const searchUsers = asyncHandler(async (req, res) => {
+  const { q } = req.query;
+  if (!q || q.trim().length < 1) {
+    return res.status(200).json(new ApiResponse(200, { users: [] }));
+  }
+
+  const escaped = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escaped, 'i'); // case-insensitive, matches anywhere
+
+  const users = await User.find({
+    $or: [{ username: regex }, { displayName: regex }],
+    isSuspended: false,
+    _id: { $ne: req.user._id }, // exclude self
+  })
+    .select('username displayName avatar')
+    .limit(8)
+    .lean();
+
+  return res.status(200).json(new ApiResponse(200, { users }));
+});
+
 module.exports = {
   getChannelProfile,
   getMe,
@@ -263,4 +289,5 @@ module.exports = {
   removeAvatar,
   removeBanner,
   deleteAccount,
+  searchUsers,
 };

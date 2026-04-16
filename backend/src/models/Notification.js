@@ -12,7 +12,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['new_video', 'new_comment', 'new_reply', 'new_subscriber', 'membership_purchase'],
+      enum: ['new_video', 'new_comment', 'new_reply', 'new_subscriber', 'membership_purchase', 'collab_invite', 'collab_invite_accepted', 'collab_invite_declined', 'collab_video_request', 'collab_video_approved', 'collab_video_rejected'],
       required: true,
     },
     actor: {

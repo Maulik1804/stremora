@@ -33,9 +33,19 @@ export const engagementService = {
   removeFromPlaylist:   (id, videoId)   => api.delete(`/playlists/${id}/videos/${videoId}`),
   getPlaylist:          (id)            => api.get(`/playlists/${id}`),
   getCollaborativePlaylists: ()         => api.get('/playlists/collaborative'),
+  // Collaborator invite flow
   addCollaborator:      (id, usernameOrEmail) => api.post(`/playlists/${id}/collaborators`, { usernameOrEmail }),
   removeCollaborator:   (id, userId)    => api.delete(`/playlists/${id}/collaborators/${userId}`),
   getCollaborators:     (id)            => api.get(`/playlists/${id}/collaborators`),
+  getPendingInvites:    ()              => api.get('/playlists/invites/pending'),
+  acceptCollabInvite:   (id)            => api.post(`/playlists/${id}/collaborators/accept`),
+  declineCollabInvite:  (id)            => api.post(`/playlists/${id}/collaborators/decline`),
+  // Collab video requests
+  proposeCollabVideo:   (id, videoId)   => api.post(`/playlists/${id}/collab-video`, { videoId }),
+  approveCollabVideo:   (id, videoId)   => api.patch(`/playlists/${id}/collab-video/${videoId}/approve`),
+  rejectCollabVideo:    (id, videoId)   => api.patch(`/playlists/${id}/collab-video/${videoId}/reject`),
+  getCollabVideoRequests: (id)          => api.get(`/playlists/${id}/collab-video/requests`),
+  searchUsers:          (q)             => api.get('/users/search', { params: { q } }),
 
   // Series (creator-managed episode playlists)
   createSeries:         (data)          => api.post('/playlists/series', data),
