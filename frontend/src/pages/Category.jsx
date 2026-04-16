@@ -1,25 +1,25 @@
 import { useEffect, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Music2, Gamepad2, Newspaper, Trophy, BookOpen, Film, Monitor, Plane, UtensilsCrossed, Shirt, Laugh, FlaskConical, Tv2 } from 'lucide-react';
 import VideoGrid from '../components/video/VideoGrid';
 import Spinner from '../components/ui/Spinner';
 import { videoService } from '../services/video.service';
 
 const CATEGORY_META = {
-  music:        { emoji: '🎵', color: 'from-purple-900/40' },
-  gaming:       { emoji: '🎮', color: 'from-green-900/40' },
-  news:         { emoji: '📰', color: 'from-blue-900/40' },
-  sports:       { emoji: '⚽', color: 'from-orange-900/40' },
-  education:    { emoji: '📚', color: 'from-yellow-900/40' },
-  entertainment:{ emoji: '🎬', color: 'from-pink-900/40' },
-  technology:   { emoji: '💻', color: 'from-cyan-900/40' },
-  travel:       { emoji: '✈️', color: 'from-teal-900/40' },
-  food:         { emoji: '🍕', color: 'from-red-900/40' },
-  fashion:      { emoji: '👗', color: 'from-rose-900/40' },
-  comedy:       { emoji: '😂', color: 'from-amber-900/40' },
-  science:      { emoji: '🔬', color: 'from-indigo-900/40' },
+  music:        { icon: Music2,          color: 'from-purple-900/40' },
+  gaming:       { icon: Gamepad2,        color: 'from-green-900/40' },
+  news:         { icon: Newspaper,       color: 'from-blue-900/40' },
+  sports:       { icon: Trophy,          color: 'from-orange-900/40' },
+  education:    { icon: BookOpen,        color: 'from-yellow-900/40' },
+  entertainment:{ icon: Film,            color: 'from-pink-900/40' },
+  technology:   { icon: Monitor,         color: 'from-cyan-900/40' },
+  travel:       { icon: Plane,           color: 'from-teal-900/40' },
+  food:         { icon: UtensilsCrossed, color: 'from-red-900/40' },
+  fashion:      { icon: Shirt,           color: 'from-rose-900/40' },
+  comedy:       { icon: Laugh,           color: 'from-amber-900/40' },
+  science:      { icon: FlaskConical,    color: 'from-indigo-900/40' },
 };
 
 const Category = () => {
@@ -27,7 +27,8 @@ const Category = () => {
   const navigate = useNavigate();
   const loaderRef = useRef(null);
 
-  const meta = CATEGORY_META[slug?.toLowerCase()] ?? { emoji: '📺', color: 'from-[#272727]' };
+  const meta = CATEGORY_META[slug?.toLowerCase()] ?? { icon: Tv2, color: 'from-[#272727]' };
+  const Icon = meta.icon;
   const label = slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : '';
 
   const {
@@ -67,7 +68,9 @@ const Category = () => {
             Back
           </button>
           <div className="flex items-center gap-4">
-            <span className="text-5xl">{meta.emoji}</span>
+            <div className="w-14 h-14 rounded-2xl bg-white/8 flex items-center justify-center flex-shrink-0">
+              <Icon size={28} className="text-[#e8e8e8]" />
+            </div>
             <div>
               <h1 className="text-3xl font-black text-[#f1f1f1]">{label}</h1>
               <p className="text-sm text-[#aaaaaa] mt-1">

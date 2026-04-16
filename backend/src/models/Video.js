@@ -86,6 +86,15 @@ const videoSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
 
     // ── Feature 2: Skip segments ──────────────────────────────────────────────
     // Each segment: { start, end, count } — count = how many users marked it

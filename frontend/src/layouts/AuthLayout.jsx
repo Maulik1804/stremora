@@ -1,12 +1,13 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Upload, Bell, MessageSquare, BarChart2, Target } from 'lucide-react';
 
 const FEATURES = [
-  { emoji: '🎬', text: 'Upload and share videos with the world' },
-  { emoji: '🔔', text: 'Subscribe and never miss new content' },
-  { emoji: '💬', text: 'Comment, like, and engage with creators' },
-  { emoji: '📊', text: 'Creator analytics and channel dashboard' },
-  { emoji: '🎯', text: 'Set goals and track your watch progress' },
+  { icon: Upload,       text: 'Upload and share videos with the world' },
+  { icon: Bell,         text: 'Subscribe and never miss new content' },
+  { icon: MessageSquare,text: 'Comment, like, and engage with creators' },
+  { icon: BarChart2,    text: 'Creator analytics and channel dashboard' },
+  { icon: Target,       text: 'Set goals and track your watch progress' },
 ];
 
 const AuthLayout = () => {
@@ -52,7 +53,7 @@ const AuthLayout = () => {
             </div>
 
             <ul className="flex flex-col gap-3.5">
-              {FEATURES.map(({ emoji, text }, i) => (
+              {FEATURES.map(({ icon: Icon, text }, i) => (
                 <motion.li
                   key={text}
                   initial={{ opacity: 0, x: -16 }}
@@ -60,7 +61,9 @@ const AuthLayout = () => {
                   transition={{ duration: 0.35, delay: 0.3 + i * 0.07 }}
                   className="flex items-center gap-3.5 text-sm text-[#777]"
                 >
-                  <span className="text-xl w-7 flex-shrink-0">{emoji}</span>
+                  <span className="w-7 flex-shrink-0 flex items-center justify-center">
+                    <Icon size={16} className="text-[#555]" />
+                  </span>
                   <span>{text}</span>
                 </motion.li>
               ))}

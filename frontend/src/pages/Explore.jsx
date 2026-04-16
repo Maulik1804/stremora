@@ -1,20 +1,20 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Compass, Sparkles } from 'lucide-react';
+import { Compass, Sparkles, Music2, Gamepad2, Newspaper, Trophy, BookOpen, Film, Monitor, Plane, UtensilsCrossed, Shirt, Laugh, FlaskConical } from 'lucide-react';
 
 const CATEGORIES = [
-  { slug: 'music',         label: 'Music',        emoji: '🎵', color: '#7c3aed', glow: 'rgba(124,58,237,0.3)' },
-  { slug: 'gaming',        label: 'Gaming',       emoji: '🎮', color: '#16a34a', glow: 'rgba(22,163,74,0.3)' },
-  { slug: 'news',          label: 'News',         emoji: '📰', color: '#2563eb', glow: 'rgba(37,99,235,0.3)' },
-  { slug: 'sports',        label: 'Sports',       emoji: '⚽', color: '#ea580c', glow: 'rgba(234,88,12,0.3)' },
-  { slug: 'education',     label: 'Education',    emoji: '📚', color: '#ca8a04', glow: 'rgba(202,138,4,0.3)' },
-  { slug: 'entertainment', label: 'Entertainment',emoji: '🎬', color: '#db2777', glow: 'rgba(219,39,119,0.3)' },
-  { slug: 'technology',    label: 'Technology',   emoji: '💻', color: '#0891b2', glow: 'rgba(8,145,178,0.3)' },
-  { slug: 'travel',        label: 'Travel',       emoji: '✈️', color: '#0d9488', glow: 'rgba(13,148,136,0.3)' },
-  { slug: 'food',          label: 'Food',         emoji: '🍕', color: '#e50914', glow: 'rgba(229,9,20,0.3)' },
-  { slug: 'fashion',       label: 'Fashion',      emoji: '👗', color: '#be185d', glow: 'rgba(190,24,93,0.3)' },
-  { slug: 'comedy',        label: 'Comedy',       emoji: '😂', color: '#d97706', glow: 'rgba(217,119,6,0.3)' },
-  { slug: 'science',       label: 'Science',      emoji: '🔬', color: '#4f46e5', glow: 'rgba(79,70,229,0.3)' },
+  { slug: 'music',         label: 'Music',         icon: Music2,          color: '#7c3aed', glow: 'rgba(124,58,237,0.3)' },
+  { slug: 'gaming',        label: 'Gaming',        icon: Gamepad2,        color: '#16a34a', glow: 'rgba(22,163,74,0.3)' },
+  { slug: 'news',          label: 'News',          icon: Newspaper,       color: '#2563eb', glow: 'rgba(37,99,235,0.3)' },
+  { slug: 'sports',        label: 'Sports',        icon: Trophy,          color: '#ea580c', glow: 'rgba(234,88,12,0.3)' },
+  { slug: 'education',     label: 'Education',     icon: BookOpen,        color: '#ca8a04', glow: 'rgba(202,138,4,0.3)' },
+  { slug: 'entertainment', label: 'Entertainment', icon: Film,            color: '#db2777', glow: 'rgba(219,39,119,0.3)' },
+  { slug: 'technology',    label: 'Technology',    icon: Monitor,         color: '#0891b2', glow: 'rgba(8,145,178,0.3)' },
+  { slug: 'travel',        label: 'Travel',        icon: Plane,           color: '#0d9488', glow: 'rgba(13,148,136,0.3)' },
+  { slug: 'food',          label: 'Food',          icon: UtensilsCrossed, color: '#e50914', glow: 'rgba(229,9,20,0.3)' },
+  { slug: 'fashion',       label: 'Fashion',       icon: Shirt,           color: '#be185d', glow: 'rgba(190,24,93,0.3)' },
+  { slug: 'comedy',        label: 'Comedy',        icon: Laugh,           color: '#d97706', glow: 'rgba(217,119,6,0.3)' },
+  { slug: 'science',       label: 'Science',       icon: FlaskConical,    color: '#4f46e5', glow: 'rgba(79,70,229,0.3)' },
 ];
 
 const Explore = () => (
@@ -55,7 +55,7 @@ const Explore = () => (
 
     {/* Category grid */}
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-      {CATEGORIES.map(({ slug, label, emoji, color, glow }, i) => (
+      {CATEGORIES.map(({ slug, label, icon: Icon, color, glow }, i) => (
         <motion.div
           key={slug}
           initial={{ opacity: 0, scale: 0.88, y: 12 }}
@@ -70,13 +70,12 @@ const Explore = () => (
                 border: `1px solid ${color}22`,
               }}
             >
-              <motion.span
-                className="text-4xl"
-                whileHover={{ scale: 1.2, rotate: [0, -8, 8, 0] }}
-                transition={{ duration: 0.4 }}
+              <motion.div
+                whileHover={{ scale: 1.2 }}
+                transition={{ duration: 0.2 }}
               >
-                {emoji}
-              </motion.span>
+                <Icon size={32} style={{ color }} />
+              </motion.div>
               <span className="text-sm font-semibold text-white/90 text-center leading-tight">{label}</span>
             </div>
           </Link>

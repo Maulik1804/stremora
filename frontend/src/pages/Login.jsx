@@ -41,6 +41,10 @@ const Login = () => {
       setError('root', { message: result.payload || 'Login failed' });
     } else {
       toast.success('Welcome back!');
+      // Admin always goes to admin panel
+      if (result?.payload?.user?.role === 'admin') {
+        navigate('/admin', { replace: true });
+      }
     }
   };
 

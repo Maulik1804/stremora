@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+﻿import { useEffect, useRef, useCallback } from 'react';
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -10,7 +10,7 @@ import { useSidebar } from '../../hooks/useSidebar';
 import { useAuth } from '../../hooks/useAuth';
 import Avatar from '../ui/Avatar';
 
-// ── Nav definitions ───────────────────────────────────────────────────────────
+// â”€â”€ Nav definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const NAV_PUBLIC = [
   { icon: Home,       label: 'Home',      to: '/' },
   { icon: TrendingUp, label: 'Trending',  to: '/trending' },
@@ -33,7 +33,7 @@ const NAV_CREATOR = [
   { icon: Settings,        label: 'Settings',           to: '/settings' },
 ];
 
-// ── NavItem ───────────────────────────────────────────────────────────────────
+// â”€â”€ NavItem â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const NavItem = ({ icon: Icon, label, to, collapsed, onClick }) => (
   <NavLink
     to={to}
@@ -71,9 +71,9 @@ const SectionLabel = ({ label }) => (
   </p>
 );
 
-// ── Shared nav list ───────────────────────────────────────────────────────────
+// â”€â”€ Shared nav list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const NavList = ({ collapsed = false, onItemClick }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   return (
     <nav className="flex flex-col gap-0.5 p-2 pt-3">
@@ -99,7 +99,7 @@ const NavList = ({ collapsed = false, onItemClick }) => {
   );
 };
 
-// ── Desktop Sidebar ───────────────────────────────────────────────────────────
+// â”€â”€ Desktop Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const DesktopSidebar = () => {
   const { isExpanded } = useSidebar();
 
@@ -122,7 +122,7 @@ export const DesktopSidebar = () => {
             transition={{ duration: 0.15 }}
             className="mt-auto p-4 text-[10px] text-[#252525] text-center"
           >
-            © 2026 Streamora
+            Â© 2026 Streamora
           </motion.p>
         )}
       </AnimatePresence>
@@ -130,7 +130,7 @@ export const DesktopSidebar = () => {
   );
 };
 
-// ── Mobile Drawer ─────────────────────────────────────────────────────────────
+// â”€â”€ Mobile Drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const MobileDrawer = () => {
   const { mobileOpen, setMobileOpen } = useSidebar();
   const { user, isAuthenticated } = useAuth();
@@ -215,7 +215,7 @@ export const MobileDrawer = () => {
                        flex flex-col overflow-hidden md:hidden
                        shadow-[4px_0_40px_rgba(0,0,0,0.8)]"
           >
-            {/* ── Header ── */}
+            {/* â”€â”€ Header â”€â”€ */}
             <div className="flex items-center justify-between px-4 h-14 border-b border-white/6 flex-shrink-0">
               <Link to="/" onClick={close} className="flex items-center select-none" aria-label="Streamora home">
                 <img src="/logo.png" alt="Streamora" className="h-8 w-auto object-contain" />
@@ -232,7 +232,7 @@ export const MobileDrawer = () => {
               </button>
             </div>
 
-            {/* ── User profile strip (authenticated) ── */}
+            {/* â”€â”€ User profile strip (authenticated) â”€â”€ */}
             {isAuthenticated && user && (
               <Link
                 to={`/channel/${user.username}`}
@@ -250,12 +250,12 @@ export const MobileDrawer = () => {
               </Link>
             )}
 
-            {/* ── Nav list (scrollable) ── */}
+            {/* â”€â”€ Nav list (scrollable) â”€â”€ */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
               <NavList collapsed={false} onItemClick={close} />
             </div>
 
-            {/* ── Footer ── */}
+            {/* â”€â”€ Footer â”€â”€ */}
             <div className="flex-shrink-0 border-t border-white/5 p-3 space-y-1">
               {!isAuthenticated && (
                 <Link
@@ -270,7 +270,7 @@ export const MobileDrawer = () => {
                   Sign in
                 </Link>
               )}
-              <p className="text-[10px] text-[#252525] text-center pt-1">© 2026 Streamora</p>
+              <p className="text-[10px] text-[#252525] text-center pt-1">Â© 2026 Streamora</p>
             </div>
           </motion.aside>
         </>
@@ -279,7 +279,7 @@ export const MobileDrawer = () => {
   );
 };
 
-// ── Default export (both combined) ───────────────────────────────────────────
+// â”€â”€ Default export (both combined) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const Sidebar = () => (
   <>
     <DesktopSidebar />

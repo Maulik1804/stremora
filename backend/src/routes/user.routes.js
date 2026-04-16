@@ -12,6 +12,7 @@ const {
   updateBanner,
   removeAvatar,
   removeBanner,
+  deleteAccount,
 } = require('../controllers/user.controller');
 
 const verifyJWT = require('../middlewares/auth.middleware');
@@ -56,6 +57,8 @@ router.delete('/me/avatar', verifyJWT, removeAvatar);
 
 router.post('/me/banner', verifyJWT, uploadBanner.single('banner'), handleUploadError, updateBanner);
 router.delete('/me/banner', verifyJWT, removeBanner);
+
+router.delete('/me', verifyJWT, deleteAccount);
 
 // ── Public channel profile — AFTER /me routes ─────────────────────────────────
 router.get('/:username', optionalJWT, getChannelProfile);

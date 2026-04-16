@@ -3,11 +3,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Save, Lock, User, Shield, Palette } from 'lucide-react';
+import { Camera, Save, Lock, User, Shield, Palette, Trash2, AlertTriangle, X } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { userService } from '../services/user.service';
-import { setCredentials } from '../store/slices/authSlice';
+import { setCredentials, logout } from '../store/slices/authSlice';
 import { useAuth } from '../hooks/useAuth';
 import Avatar from '../components/ui/Avatar';
 import FormField from '../components/ui/FormField';
@@ -66,13 +67,17 @@ const Section = ({ title, icon: Icon, children, index = 0 }) => (
 const Settings = () => {
   const { user } = useAuth();
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [bannerPreview, setBannerPreview] = useState(null);
   const [showAvatarCropper, setShowAvatarCropper] = useState(false);
   const [showBannerCropper, setShowBannerCropper] = useState(false);
   const [imageToCrop, setImageToCrop] = useState(null);
-  const [cropType, setCropType] = useState(null); // 'avatar' or 'banner'
+  const [cropType, setCropType] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   const profileForm = useForm({
     resolver: zodResolver(profileSchema),
@@ -115,6 +120,18 @@ const Settings = () => {
       toast.success('Banner updated');
     },
     onError: () => toast.error('Banner upload failed'),
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: (password) => userService.deleteAccount(password),
+    onSuccess: () => {
+      dispatch(logout());
+      toast.success('Account deleted');
+      navigate('/login', { replace: true });
+    },
+    onError: (err) => {
+      setDeleteError(err.response?.data?.message || 'Incorrect password');
+    },
   });
 
   const handleImageSelect = (file, type) => {
@@ -314,8 +331,116 @@ const Settings = () => {
             </div>
           </form>
         </Section>
+
+        {/* Danger zone — Delete account */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.28, duration: 0.25 }}
+          className="bg-[#0f0f0f] border border-red-500/20 rounded-2xl overflow-hidden"
+        >
+          <div className="px-6 py-4 border-b border-red-500/10 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-red-500/10 flex items-center justify-center">
+              <AlertTriangle size={15} className="text-red-400" />
+            </div>
+            <h2 className="text-sm font-semibold text-red-400">Danger zone</h2>
+          </div>
+          <div className="px-6 py-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-[#e0e0e0]">Delete account</p>
+              <p className="text-xs text-[#555] mt-0.5">Permanently delete your account and all your videos. This cannot be undone.</p>
+            </div>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => { setShowDeleteModal(true); setDeleteError(''); setDeletePassword(''); }}
+              className="flex-shrink-0"
+            >
+              <Trash2 size={14} /> Delete
+            </Button>
+          </div>
+        </motion.div>
+
       </div>
     </div>
+
+    {/* Delete account confirmation modal */}
+    <AnimatePresence>
+      {showDeleteModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+          onClick={() => setShowDeleteModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.92, opacity: 0, y: 12 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.92, opacity: 0, y: 12 }}
+            transition={{ duration: 0.18 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#111] border border-red-500/25 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                  <Trash2 size={18} className="text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-[#e8e8e8] font-semibold">Delete your account?</h3>
+                  <p className="text-xs text-[#555] mt-0.5">This will permanently delete everything</p>
+                </div>
+              </div>
+              <button onClick={() => setShowDeleteModal(false)} className="text-[#555] hover:text-[#e8e8e8] transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="bg-red-500/8 border border-red-500/15 rounded-xl p-3 mb-4">
+              <p className="text-xs text-red-300 leading-relaxed">
+                This will permanently delete your account, all your videos, comments, and data from our servers. <strong>This action cannot be undone.</strong>
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="text-xs font-medium text-[#888] block mb-1.5">
+                  Enter your password to confirm
+                </label>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(''); }}
+                  placeholder="Your current password"
+                  className="w-full bg-[#0a0a0a] border border-white/8 rounded-xl px-4 py-2.5 text-sm text-[#e8e8e8] placeholder:text-[#444] outline-none focus:border-red-500/40 transition-colors"
+                  autoComplete="current-password"
+                />
+                {deleteError && (
+                  <p className="text-xs text-red-400 mt-1.5">{deleteError}</p>
+                )}
+              </div>
+
+              <div className="flex gap-2 mt-1">
+                <Button variant="secondary" size="sm" className="flex-1" onClick={() => setShowDeleteModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  className="flex-1"
+                  disabled={!deletePassword}
+                  loading={deleteAccountMutation.isPending}
+                  onClick={() => deleteAccountMutation.mutate(deletePassword)}
+                >
+                  <Trash2 size={14} /> Delete account
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
     </>
   );
 };

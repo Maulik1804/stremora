@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Search, X, Upload, Bell, LogIn, TrendingUp, Clock } from 'lucide-react';
+import { Menu, Search, X, Upload, Bell, LogIn, TrendingUp, Clock, Tv2, Clapperboard, LayoutDashboard, Settings, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useSidebar } from '../../hooks/useSidebar';
@@ -359,14 +359,14 @@ const Navbar = () => {
 
                     <div className="p-1.5">
                       {[
-                        { label: 'Your channel', to: `/channel/${user?.username}`, emoji: '📺' },
-                        { label: 'Studio', to: '/studio', emoji: '🎬' },
-                        { label: 'Dashboard', to: '/dashboard', emoji: '📊' },
-                        { label: 'Settings', to: '/settings', emoji: '⚙️' },
-                      ].map(({ label, to, emoji }) => (
+                        { label: 'Your channel', to: `/channel/${user?.username}`, icon: Tv2 },
+                        { label: 'Studio',        to: '/studio',                   icon: Clapperboard },
+                        { label: 'Dashboard',     to: '/dashboard',                icon: LayoutDashboard },
+                        { label: 'Settings',      to: '/settings',                 icon: Settings },
+                      ].map(({ label, to, icon: Icon }) => (
                         <Link key={to} to={to} onClick={() => setShowUserMenu(false)}
                           className="flex items-center gap-3 px-3 py-2.5 text-sm text-[#ccc] hover:text-[#f0f0f0] hover:bg-white/5 rounded-xl transition-all duration-150">
-                          <span className="text-base">{emoji}</span>
+                          <Icon size={15} className="text-[#666] flex-shrink-0" />
                           {label}
                         </Link>
                       ))}
@@ -377,7 +377,7 @@ const Navbar = () => {
                         onClick={() => { navigate('/logout'); setShowUserMenu(false); }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-[#ff6b6b] hover:text-[#ff4444] hover:bg-red-500/8 rounded-xl transition-all duration-150"
                       >
-                        <span className="text-base">🚪</span>
+                        <LogOut size={15} className="flex-shrink-0" />
                         Sign out
                       </button>
                     </div>

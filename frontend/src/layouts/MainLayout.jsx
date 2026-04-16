@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSelector, useDispatch } from 'react-redux';
+import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/layout/Navbar';
 import Sidebar from '../components/layout/Sidebar';
 import { selectSidebarExpanded, setSidebarExpanded } from '../store/slices/sidebarSlice';
@@ -19,7 +20,16 @@ const MainLayout = () => {
   const focusMode = useSelector(selectFocusMode);
   const dispatch = useDispatch();
   const location = useLocation();
+  const navigate = useNavigate();
   const windowWidth = useWindowWidth();
+  const { user, initialized } = useAuth();
+
+  // Redirect admin users away from main site to admin panel
+  useEffect(() => {
+    if (initialized && user?.role === 'admin') {
+      navigate('/admin', { replace: true });
+    }
+  }, [initialized, user, navigate]);
 
   // Scroll to top on route change
   useEffect(() => {

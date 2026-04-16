@@ -15,4 +15,5 @@ export const userService = {
     }),
   removeAvatar: () => api.delete('/users/me/avatar'),
   removeBanner: () => api.delete('/users/me/banner'),
+  deleteAccount: (password) => api.delete('/users/me', { data: { password } }),
 };

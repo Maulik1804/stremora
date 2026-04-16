@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Film, Plus, Trash2, Eye, Globe, Lock,
-  PlaySquare, AlertTriangle,
-} from 'lucide-react';
+import { Film, Plus, Trash2, Eye, Globe, Lock, PlaySquare, AlertTriangle } from 'lucide-react';
 import { engagementService } from '../services/engagement.service';
 import api from '../services/api';
 import Button from '../components/ui/Button';
@@ -45,10 +42,41 @@ const DeleteModal = ({ playlist, onConfirm, onCancel, isDeleting }) => (
   </motion.div>
 );
 
+// ── Playlist thumbnail — YouTube-style stacked effect ─────────────────────────
+const PlaylistThumbnail = ({ playlist }) => {
+  const thumb = playlist.seriesThumbnail || playlist.videos?.[0]?.thumbnailUrl;
+  const count = playlist.episodeCount ?? playlist.videos?.length ?? 0;
+
+  if (!thumb) {
+    return (
+      <div className="w-24 aspect-video rounded-lg bg-[#1a1a1a] flex-shrink-0 flex flex-col items-center justify-center gap-1">
+        <Film size={16} className="text-[#333]" />
+        <span className="text-[9px] text-[#444] font-medium">{count} videos</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-24 aspect-video flex-shrink-0 relative" style={{ perspective: '200px' }}>
+      {/* Stack layers */}
+      <div className="absolute inset-x-1 top-0.5 bottom-0 rounded-md bg-[#2a2a2a]" />
+      <div className="absolute inset-x-0.5 top-0.5 bottom-0 rounded-md bg-[#1f1f1f]" />
+      {/* Main thumbnail */}
+      <div className="absolute inset-0 rounded-lg overflow-hidden">
+        <img src={thumb} alt={playlist.title} className="w-full h-full object-cover" />
+        {/* Count overlay on right */}
+        <div className="absolute inset-y-0 right-0 w-8 bg-black/75 flex flex-col items-center justify-center gap-0.5">
+          <PlaySquare size={10} className="text-white" />
+          <span className="text-white text-[9px] font-bold leading-none">{count}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Playlist row ──────────────────────────────────────────────────────────────
 const PlaylistRow = ({ playlist, onDelete }) => {
   const episodeCount = playlist.episodeCount ?? playlist.videos?.length ?? 0;
-  const thumbnail = playlist.seriesThumbnail || playlist.videos?.[0]?.thumbnailUrl;
 
   return (
     <motion.tr
@@ -58,15 +86,7 @@ const PlaylistRow = ({ playlist, onDelete }) => {
       {/* Thumbnail + title */}
       <td className="px-5 py-3">
         <div className="flex items-center gap-3">
-          <div className="w-24 aspect-video rounded-lg overflow-hidden bg-[#1a1a1a] flex-shrink-0 relative">
-            {thumbnail
-              ? <img src={thumbnail} alt={playlist.title} className="w-full h-full object-cover" />
-              : <div className="w-full h-full flex items-center justify-center"><Film size={16} className="text-[#333]" /></div>
-            }
-            <div className="absolute top-1 left-1 bg-[#ff0000]/90 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide">
-              Playlist
-            </div>
-          </div>
+          <PlaylistThumbnail playlist={playlist} />
           <div className="min-w-0">
             <Link
               to={`/channel-playlist/${playlist._id}`}
@@ -187,8 +207,7 @@ const ChannelPlaylists = () => {
           <div className="flex justify-center items-center h-48"><Spinner size="lg" /></div>
         ) : playlists.length === 0 ? (
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             className="flex flex-col items-center gap-5 py-24 text-center"
           >
             <div className="w-20 h-20 rounded-3xl bg-[#0f0f0f] border border-[#1f1f1f] flex items-center justify-center">

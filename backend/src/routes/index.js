@@ -13,6 +13,7 @@ const historyRouter = require('./history.routes');
 const featuresRouter = require('./features.routes');
 const notificationRouter = require('./notification.routes');
 const goalRouter = require('./goal.routes');
+const adminRouter = require('./admin.routes');
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use('/history', historyRouter);
 router.use('/features', featuresRouter);
 router.use('/notifications', notificationRouter);
 router.use('/goals', goalRouter);
+router.use('/admin', adminRouter);
 
 module.exports = router;

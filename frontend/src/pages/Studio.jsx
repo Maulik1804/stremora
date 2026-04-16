@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Edit2, Trash2, Eye, ThumbsUp, MessageSquare, Globe, Lock, Link2, AlertTriangle, Film } from 'lucide-react';
-import api from '../services/api';
+import {
+  Upload, Edit2, Trash2, Eye, ThumbsUp, MessageSquare,
+  Globe, Lock, Link2, AlertTriangle, Film,
+} from 'lucide-react';
 import { videoService } from '../services/video.service';
 import AddToSeriesModal from '../components/series/AddToSeriesModal';
 import Spinner from '../components/ui/Spinner';
@@ -14,17 +16,13 @@ import { formatDistanceToNow } from '../utils/date';
 // ── Delete confirm modal ──────────────────────────────────────────────────────
 const DeleteModal = ({ video, onConfirm, onCancel, isDeleting }) => (
   <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
     className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     onClick={onCancel}
   >
     <motion.div
-      initial={{ scale: 0.92, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.92, opacity: 0 }}
-      transition={{ duration: 0.15 }}
+      initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.92, opacity: 0 }} transition={{ duration: 0.15 }}
       onClick={(e) => e.stopPropagation()}
       className="bg-[#1a1a1a] border border-[#3f3f3f] rounded-2xl p-6 max-w-sm w-full"
     >
@@ -62,12 +60,84 @@ const VisibilityBadge = ({ visibility }) => {
   );
 };
 
+// ── Action buttons — always visible ──────────────────────────────────────────
+const ActionButtons = ({ video, onDelete, onSeries }) => (
+  <div className="flex items-center gap-1">
+    <Link to={`/watch/${video._id}`}>
+      <button
+        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-[#aaaaaa] hover:text-[#f1f1f1] transition-colors"
+        title="Watch"
+      >
+        <Eye size={15} />
+      </button>
+    </Link>
+    <Link to={`/studio/edit/${video._id}`}>
+      <button
+        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-[#aaaaaa] hover:text-[#f1f1f1] transition-colors"
+        title="Edit"
+      >
+        <Edit2 size={15} />
+      </button>
+    </Link>
+    <button
+      onClick={() => onSeries(video._id)}
+      className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-[#aaaaaa] hover:text-[#f1f1f1] transition-colors"
+      title="Add to Playlist"
+    >
+      <Film size={15} />
+    </button>
+    <button
+      onClick={() => onDelete(video)}
+      className="p-2 rounded-lg bg-white/5 hover:bg-red-900/30 text-[#aaaaaa] hover:text-red-400 transition-colors"
+      title="Delete"
+    >
+      <Trash2 size={15} />
+    </button>
+  </div>
+);
+
+// ── Mobile video card ─────────────────────────────────────────────────────────
+const VideoCard = ({ video, onDelete, onSeries }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 8 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="bg-[#141414] border border-[#2a2a2a] rounded-2xl overflow-hidden"
+  >
+    {/* Thumbnail */}
+    <div className="relative w-full aspect-video bg-[#272727]">
+      {video.thumbnailUrl
+        ? <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
+        : <div className="w-full h-full flex items-center justify-center"><Film size={24} className="text-[#444]" /></div>
+      }
+      <div className="absolute top-2 left-2">
+        <VisibilityBadge visibility={video.visibility} />
+      </div>
+    </div>
+
+    {/* Info */}
+    <div className="p-3">
+      <Link to={`/watch/${video._id}`} className="text-sm font-semibold text-[#f1f1f1] line-clamp-2 leading-snug hover:text-white">
+        {video.title}
+      </Link>
+      <div className="flex items-center gap-3 mt-2 text-xs text-[#666]">
+        <span className="flex items-center gap-1"><Eye size={11} />{formatCount(video.viewCount)}</span>
+        <span className="flex items-center gap-1"><ThumbsUp size={11} />{formatCount(video.likeCount)}</span>
+        <span className="flex items-center gap-1"><MessageSquare size={11} />{formatCount(video.commentCount)}</span>
+        <span className="ml-auto">{formatDistanceToNow(video.createdAt)}</span>
+      </div>
+      <div className="mt-3 pt-3 border-t border-white/5">
+        <ActionButtons video={video} onDelete={onDelete} onSeries={onSeries} />
+      </div>
+    </div>
+  </motion.div>
+);
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 const Studio = () => {
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [filter, setFilter] = useState('all'); // all | published | processing | private
-  const [seriesTarget, setSeriesTarget] = useState(null); // videoId for AddToSeriesModal
+  const [filter, setFilter] = useState('all');
+  const [seriesTarget, setSeriesTarget] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['studio-videos'],
@@ -89,8 +159,8 @@ const Studio = () => {
         filter === 'private' ? v.visibility === 'private' : v.status === filter
       );
 
-  const totalViews    = allVideos.reduce((s, v) => s + (v.viewCount ?? 0), 0);
-  const totalLikes    = allVideos.reduce((s, v) => s + (v.likeCount ?? 0), 0);
+  const totalViews = allVideos.reduce((s, v) => s + (v.viewCount ?? 0), 0);
+  const totalLikes = allVideos.reduce((s, v) => s + (v.likeCount ?? 0), 0);
 
   return (
     <>
@@ -104,10 +174,7 @@ const Studio = () => {
           />
         )}
         {seriesTarget && (
-          <AddToSeriesModal
-            videoId={seriesTarget}
-            onClose={() => setSeriesTarget(null)}
-          />
+          <AddToSeriesModal videoId={seriesTarget} onClose={() => setSeriesTarget(null)} />
         )}
       </AnimatePresence>
 
@@ -117,7 +184,7 @@ const Studio = () => {
           <div>
             <h1 className="text-2xl font-bold text-[#f1f1f1]">Studio</h1>
             <p className="text-sm text-[#aaaaaa] mt-0.5">
-              {allVideos.length} videos · {formatCount(totalViews)} total views · {formatCount(totalLikes)} total likes
+              {allVideos.length} videos · {formatCount(totalViews)} views · {formatCount(totalLikes)} likes
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -126,8 +193,7 @@ const Studio = () => {
             </Link>
             <Link to="/upload">
               <Button variant="primary" size="sm">
-                <Upload size={14} />
-                Upload video
+                <Upload size={14} /> Upload
               </Button>
             </Link>
           </div>
@@ -152,7 +218,7 @@ const Studio = () => {
           ))}
         </div>
 
-        {/* Table */}
+        {/* Content */}
         {isLoading ? (
           <div className="flex justify-center items-center h-48"><Spinner size="lg" /></div>
         ) : videos.length === 0 ? (
@@ -168,101 +234,81 @@ const Studio = () => {
             )}
           </div>
         ) : (
-          <div className="bg-[#141414] border border-[#2a2a2a] rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#1f1f1f] text-[#606060] text-xs uppercase tracking-wide">
-                    <th className="text-left px-5 py-3 font-medium">Video</th>
-                    <th className="text-left px-4 py-3 font-medium">Visibility</th>
-                    <th className="text-left px-4 py-3 font-medium">
-                      <span className="flex items-center gap-1"><Eye size={12} /> Views</span>
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium">
-                      <span className="flex items-center gap-1"><ThumbsUp size={12} /> Likes</span>
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium">
-                      <span className="flex items-center gap-1"><MessageSquare size={12} /> Comments</span>
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium">Date</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {videos.map((v) => (
-                    <motion.tr
-                      key={v._id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="border-b border-[#1f1f1f] hover:bg-[#1a1a1a] transition-colors group"
-                    >
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-24 aspect-video rounded-lg overflow-hidden bg-[#272727] flex-shrink-0">
-                            {v.thumbnailUrl && (
-                              <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <Link
-                              to={`/watch/${v._id}`}
-                              className="text-sm font-medium text-[#f1f1f1] hover:text-white line-clamp-2 leading-snug"
-                            >
-                              {v.title}
-                            </Link>
-                            <span className={`text-xs mt-0.5 inline-block
-                              ${v.status === 'published' ? 'text-green-400'
-                                : v.status === 'processing' ? 'text-yellow-400'
-                                : 'text-red-400'}`}
-                            >
-                              {v.status}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <VisibilityBadge visibility={v.visibility} />
-                      </td>
-                      <td className="px-4 py-3 text-[#aaaaaa] tabular-nums">{formatCount(v.viewCount)}</td>
-                      <td className="px-4 py-3 text-[#aaaaaa] tabular-nums">{formatCount(v.likeCount)}</td>
-                      <td className="px-4 py-3 text-[#aaaaaa] tabular-nums">{formatCount(v.commentCount)}</td>
-                      <td className="px-4 py-3 text-[#aaaaaa] text-xs whitespace-nowrap">
-                        {formatDistanceToNow(v.createdAt)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Link to={`/watch/${v._id}`}>
-                            <button className="p-1.5 rounded-lg hover:bg-[#272727] text-[#aaaaaa] hover:text-[#f1f1f1] transition-colors" title="Watch">
-                              <Eye size={15} />
-                            </button>
-                          </Link>
-                          <Link to={`/studio/edit/${v._id}`}>
-                            <button className="p-1.5 rounded-lg hover:bg-[#272727] text-[#aaaaaa] hover:text-[#f1f1f1] transition-colors" title="Edit">
-                              <Edit2 size={15} />
-                            </button>
-                          </Link>
-                          <button
-                            onClick={() => setSeriesTarget(v._id)}
-                            className="p-1.5 rounded-lg hover:bg-[#272727] text-[#aaaaaa] hover:text-[#f1f1f1] transition-colors"
-                            title="Add to Channel Playlist"
-                          >
-                            <Film size={15} />
-                          </button>
-                          <button
-                            onClick={() => setDeleteTarget(v)}
-                            className="p-1.5 rounded-lg hover:bg-red-900/30 text-[#aaaaaa] hover:text-red-400 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
+          <>
+            {/* ── Mobile: card grid ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
+              {videos.map((v) => (
+                <VideoCard
+                  key={v._id}
+                  video={v}
+                  onDelete={setDeleteTarget}
+                  onSeries={setSeriesTarget}
+                />
+              ))}
             </div>
-          </div>
+
+            {/* ── Desktop: table ── */}
+            <div className="hidden md:block bg-[#141414] border border-[#2a2a2a] rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#1f1f1f] text-[#606060] text-xs uppercase tracking-wide">
+                      <th className="text-left px-5 py-3 font-medium">Video</th>
+                      <th className="text-left px-4 py-3 font-medium">Visibility</th>
+                      <th className="text-left px-4 py-3 font-medium">
+                        <span className="flex items-center gap-1"><Eye size={12} /> Views</span>
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium">
+                        <span className="flex items-center gap-1"><ThumbsUp size={12} /> Likes</span>
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium">
+                        <span className="flex items-center gap-1"><MessageSquare size={12} /> Comments</span>
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium">Date</th>
+                      <th className="px-4 py-3 font-medium text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {videos.map((v) => (
+                      <motion.tr
+                        key={v._id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="border-b border-[#1f1f1f] hover:bg-[#1a1a1a] transition-colors"
+                      >
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-24 aspect-video rounded-lg overflow-hidden bg-[#272727] flex-shrink-0">
+                              {v.thumbnailUrl && (
+                                <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <Link to={`/watch/${v._id}`} className="text-sm font-medium text-[#f1f1f1] hover:text-white line-clamp-2 leading-snug">
+                                {v.title}
+                              </Link>
+                              <span className={`text-xs mt-0.5 inline-block
+                                ${v.status === 'published' ? 'text-green-400' : v.status === 'processing' ? 'text-yellow-400' : 'text-red-400'}`}>
+                                {v.status}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3"><VisibilityBadge visibility={v.visibility} /></td>
+                        <td className="px-4 py-3 text-[#aaaaaa] tabular-nums">{formatCount(v.viewCount)}</td>
+                        <td className="px-4 py-3 text-[#aaaaaa] tabular-nums">{formatCount(v.likeCount)}</td>
+                        <td className="px-4 py-3 text-[#aaaaaa] tabular-nums">{formatCount(v.commentCount)}</td>
+                        <td className="px-4 py-3 text-[#aaaaaa] text-xs whitespace-nowrap">{formatDistanceToNow(v.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          <ActionButtons video={v} onDelete={setDeleteTarget} onSeries={setSeriesTarget} />
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </>

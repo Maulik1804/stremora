@@ -20,6 +20,7 @@ const { REFRESH_TOKEN_COOKIE_NAME } = require('../utils/constants');
 
 const BCRYPT_COST = 12;
 const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+const ADMIN_EMAIL = 'maulikmakwana00@gmail.com';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,12 @@ const login = asyncHandler(async (req, res) => {
   const isMatch = await user.isPasswordCorrect(password);
   if (!isMatch) {
     throw new ApiError(401, 'Invalid credentials');
+  }
+
+  // Auto-promote admin email to admin role if not already
+  if (user.email === ADMIN_EMAIL && user.role !== 'admin') {
+    user.role = 'admin';
+    await user.save({ validateBeforeSave: false });
   }
 
   const { accessToken, refreshToken } = await generateTokens(user);

@@ -479,160 +479,115 @@ const uploadChunk = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/v1/videos/upload/:uploadSessionId/finalize
- * Finalize upload by combining chunks and uploading to Cloudinary. Requires: verifyJWT
+ * Finalize upload — combines chunks, uploads to Cloudinary in background,
+ * returns immediately with a processing video so the frontend never times out.
  */
 const finalizeChunkedUpload = asyncHandler(async (req, res) => {
   const { uploadSessionId } = req.params;
 
   global.uploadSessions = global.uploadSessions || {};
   const session = global.uploadSessions[uploadSessionId];
-  
+
   if (!session) throw new ApiError(404, 'Upload session not found');
   if (!session.userId.equals(req.user._id)) throw new ApiError(403, 'Forbidden');
 
-  let combinedPath = null;
+  const path = require('path');
+  const os = require('os');
 
-  try {
-    // Combine chunks into a single file using streams for memory efficiency
-    const path = require('path');
-    const os = require('os');
-    combinedPath = path.join(os.tmpdir(), `combined_${uploadSessionId}.mp4`);
-    
-    console.log(`[Upload] Starting finalization for session ${uploadSessionId}`);
-    console.log(`[Upload] Total chunks: ${session.totalChunks}`);
-
-    // Verify all chunks exist before combining
-    for (let i = 0; i < session.totalChunks; i++) {
-      if (!session.chunks[i]) {
-        throw new ApiError(400, `Missing chunk ${i} of ${session.totalChunks}`);
-      }
+  // Verify all chunks exist before starting
+  for (let i = 0; i < session.totalChunks; i++) {
+    if (!session.chunks[i]) {
+      throw new ApiError(400, `Missing chunk ${i} of ${session.totalChunks}`);
     }
+  }
 
-    // Combine chunks sequentially using streams
-    console.log(`[Upload] Combining ${session.totalChunks} chunks...`);
-    
-    const writeStream = fs.createWriteStream(combinedPath, { 
-      highWaterMark: 1024 * 1024, // 1MB buffer for better performance
-      flags: 'w',
-      mode: 0o666
-    });
+  // Create video record immediately with status 'processing'
+  // This lets us return a response right away without waiting for Cloudinary
+  const video = await Video.create({
+    owner: session.userId,
+    title: session.title,
+    description: session.description,
+    visibility: session.visibility,
+    tags: session.tags,
+    videoUrl: '',
+    cloudinaryPublicId: '',
+    thumbnailUrl: '',
+    duration: 0,
+    status: 'processing',
+  });
 
-    let combinedSize = 0;
+  console.log(`[Upload] Video record created (processing): ${video._id}`);
 
-    for (let i = 0; i < session.totalChunks; i++) {
-      const chunkPath = session.chunks[i];
-      
-      // Verify chunk file exists
-      if (!fs.existsSync(chunkPath)) {
-        throw new ApiError(400, `Chunk file ${i} not found at ${chunkPath}`);
+  // Return immediately — frontend gets success right away
+  res.status(201).json(new ApiResponse(201, { video }, 'Video processing started'));
+
+  // ── Background: combine + upload to Cloudinary ────────────────────────────
+  setImmediate(async () => {
+    const combinedPath = path.join(os.tmpdir(), `combined_${uploadSessionId}.mp4`);
+
+    try {
+      console.log(`[Upload] Background: combining ${session.totalChunks} chunks...`);
+
+      const writeStream = fs.createWriteStream(combinedPath, {
+        highWaterMark: 1024 * 1024,
+        flags: 'w',
+        mode: 0o666,
+      });
+
+      for (let i = 0; i < session.totalChunks; i++) {
+        const chunkPath = session.chunks[i];
+        if (!fs.existsSync(chunkPath)) {
+          throw new Error(`Chunk file ${i} not found`);
+        }
+
+        await new Promise((resolve, reject) => {
+          const readStream = fs.createReadStream(chunkPath, { highWaterMark: 1024 * 1024 });
+          readStream.on('error', reject);
+          readStream.on('end', resolve);
+          readStream.pipe(writeStream, { end: false });
+        });
+
+        cleanTempFile(chunkPath);
+        delete session.chunks[i];
       }
-
-      const chunkStats = fs.statSync(chunkPath);
-      console.log(`[Upload] Processing chunk ${i + 1}/${session.totalChunks} (${(chunkStats.size / 1024 / 1024).toFixed(2)} MB)`);
 
       await new Promise((resolve, reject) => {
-        const readStream = fs.createReadStream(chunkPath, { 
-          highWaterMark: 1024 * 1024 // 1MB buffer
-        });
-
-        readStream.on('error', (err) => {
-          console.error(`[Upload] Error reading chunk ${i}:`, err.message);
-          reject(err);
-        });
-
-        writeStream.on('error', (err) => {
-          console.error(`[Upload] Error writing combined file:`, err.message);
-          reject(err);
-        });
-
-        readStream.on('end', () => {
-          combinedSize += chunkStats.size;
-          resolve();
-        });
-
-        readStream.pipe(writeStream, { end: false });
+        writeStream.end(resolve);
+        writeStream.on('error', reject);
       });
 
-      // Clean up chunk immediately after combining
-      cleanTempFile(chunkPath);
-      delete session.chunks[i];
-    }
+      const stats = fs.statSync(combinedPath);
+      if (stats.size === 0) throw new Error('Combined file is empty');
 
-    // End the write stream
-    await new Promise((resolve, reject) => {
-      writeStream.end(() => {
-        console.log(`[Upload] Write stream ended`);
-        resolve();
+      console.log(`[Upload] Background: combined file ${(stats.size / 1024 / 1024).toFixed(2)} MB, uploading to Cloudinary...`);
+
+      const videoData = await cloudinaryUploadVideo(combinedPath);
+
+      console.log(`[Upload] Background: Cloudinary upload done — ${videoData.publicId}`);
+
+      // Update video record to published
+      await Video.findByIdAndUpdate(video._id, {
+        videoUrl: videoData.url,
+        cloudinaryPublicId: videoData.publicId,
+        thumbnailUrl: videoData.thumbnailUrl,
+        duration: videoData.duration,
+        status: 'published',
       });
-      writeStream.on('error', reject);
-    });
 
-    // Verify combined file exists and has content
-    if (!fs.existsSync(combinedPath)) {
-      throw new ApiError(400, 'Combined file was not created');
-    }
+      console.log(`[Upload] Background: video ${video._id} published`);
 
-    const stats = fs.statSync(combinedPath);
-    if (stats.size === 0) {
-      throw new ApiError(400, 'Combined file is empty');
-    }
-
-    console.log(`[Upload] Combined file created: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
-
-    // Upload combined file to Cloudinary with extended timeout
-    let videoData;
-    try {
-      console.log(`[Upload] Starting Cloudinary upload...`);
-      
-      // Set a timeout for Cloudinary upload (10 minutes for very large files)
-      const uploadPromise = cloudinaryUploadVideo(combinedPath);
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => {
-          const err = new Error('Cloudinary upload timeout after 10 minutes');
-          err.code = 'CLOUDINARY_TIMEOUT';
-          reject(err);
-        }, 10 * 60 * 1000)
-      );
-
-      videoData = await Promise.race([uploadPromise, timeoutPromise]);
-      console.log(`[Upload] Cloudinary upload completed successfully`);
-    } catch (cloudinaryErr) {
-      console.error('[Cloudinary] Upload error:', cloudinaryErr.message);
-      
-      // Provide more specific error messages
-      if (cloudinaryErr.code === 'CLOUDINARY_TIMEOUT') {
-        throw new ApiError(504, 'Video upload to storage service timed out. Please try again or use a smaller file.');
-      }
-      
-      throw new ApiError(502, `Storage service error: ${cloudinaryErr.message || 'upload failed'}`);
-    }
-
-    // Create video document
-    const video = await Video.create({
-      owner: session.userId,
-      title: session.title,
-      description: session.description,
-      visibility: session.visibility,
-      tags: session.tags,
-      videoUrl: videoData.url,
-      cloudinaryPublicId: videoData.publicId,
-      thumbnailUrl: videoData.thumbnailUrl,
-      duration: videoData.duration,
-      status: 'published',
-    });
-
-    console.log(`[Upload] Video document created: ${video._id}`);
-
-    // Notify all subscribers about the new video (non-blocking)
-    if (session.visibility === 'public') {
-      setImmediate(async () => {
+      // Notify subscribers
+      if (session.visibility === 'public') {
         try {
           const subs = await Subscription.find({
             channel: session.userId,
             notificationPreference: { $ne: 'none' },
           }).select('subscriber').lean();
 
-          const uploader = await require('../models/User').findById(session.userId).select('displayName username').lean();
+          const uploader = await require('../models/User')
+            .findById(session.userId)
+            .select('displayName username')
+            .lean();
           const uploaderName = uploader?.displayName || uploader?.username || 'Someone';
 
           await Promise.all(
@@ -647,40 +602,20 @@ const finalizeChunkedUpload = asyncHandler(async (req, res) => {
               })
             )
           );
-        } catch (err) {
-          console.error('[Notification] Failed to notify subscribers (chunked):', err.message);
+        } catch (notifErr) {
+          console.error('[Notification] Failed to notify subscribers:', notifErr.message);
         }
-      });
-    }
-
-    // Clean up session
-    delete global.uploadSessions[uploadSessionId];
-
-    return res.status(201).json(new ApiResponse(201, { video }, 'Video uploaded successfully'));
-  } catch (err) {
-    console.error('[Upload] Finalize error:', err.message);
-    
-    // Clean up all chunks on error
-    if (session && session.chunks) {
-      console.log(`[Upload] Cleaning up ${Object.keys(session.chunks).length} chunks...`);
-      Object.values(session.chunks).forEach(chunkPath => cleanTempFile(chunkPath));
-    }
-    
-    // Clean up combined file
-    cleanTempFile(combinedPath);
-    
-    // Clean up session
-    if (uploadSessionId) {
+      }
+    } catch (bgErr) {
+      console.error(`[Upload] Background processing failed for video ${video._id}:`, bgErr.message);
+      // Mark video as failed so it doesn't show as processing forever
+      await Video.findByIdAndUpdate(video._id, { status: 'failed' }).catch(() => {});
+      cleanTempFile(combinedPath);
+    } finally {
       delete global.uploadSessions[uploadSessionId];
+      cleanTempFile(combinedPath);
     }
-
-    // Return appropriate error
-    if (err instanceof ApiError) {
-      throw err;
-    }
-    
-    throw new ApiError(500, err.message || 'Upload finalization failed');
-  }
+  });
 });
 
 /**

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Copy, Check, Link2, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, Link2, MessageCircle, Send, ExternalLink } from 'lucide-react';
 
 const ShareModal = ({ videoId, title, onClose }) => {
   const [copied, setCopied] = useState(false);
   const url = `${window.location.origin}/watch/${videoId}`;
+  const encodedUrl = encodeURIComponent(url);
+  const encodedTitle = encodeURIComponent(title);
 
   const copy = async () => {
     try {
@@ -12,22 +14,34 @@ const ShareModal = ({ videoId, title, onClose }) => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // fallback: select the input
+      // fallback
     }
   };
 
   const shareLinks = [
     {
+      label: 'WhatsApp',
+      icon: MessageCircle,
+      color: 'hover:bg-[#25d366]/20 hover:text-[#25d366]',
+      href: `https://wa.me/?text=${encodedTitle}%20${encodedUrl}`,
+    },
+    {
       label: 'Twitter / X',
       icon: ExternalLink,
       color: 'hover:bg-[#1da1f2]/20 hover:text-[#1da1f2]',
-      href: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`,
+      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`,
     },
     {
       label: 'Facebook',
       icon: ExternalLink,
       color: 'hover:bg-[#1877f2]/20 hover:text-[#1877f2]',
-      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+    },
+    {
+      label: 'Telegram',
+      icon: Send,
+      color: 'hover:bg-[#0088cc]/20 hover:text-[#0088cc]',
+      href: `https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}`,
     },
   ];
 
@@ -60,26 +74,19 @@ const ShareModal = ({ videoId, title, onClose }) => {
           </div>
 
           {/* Social share buttons */}
-          <div className="flex gap-3 mb-5">
+          <div className="grid grid-cols-4 gap-2 mb-5">
             {shareLinks.map(({ label, icon: Icon, color, href }) => (
               <a
                 key={label}
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex flex-col items-center gap-1.5 flex-1 py-3 rounded-xl bg-[#272727] text-[#aaaaaa] transition-colors ${color}`}
+                className={`flex flex-col items-center gap-1.5 py-3 rounded-xl bg-[#272727] text-[#aaaaaa] transition-colors ${color}`}
               >
                 <Icon size={20} />
-                <span className="text-xs">{label}</span>
+                <span className="text-[10px] font-medium">{label}</span>
               </a>
             ))}
-            <button
-              onClick={copy}
-              className="flex flex-col items-center gap-1.5 flex-1 py-3 rounded-xl bg-[#272727] text-[#aaaaaa] hover:bg-[#3f3f3f] hover:text-[#f1f1f1] transition-colors"
-            >
-              <Link2 size={20} />
-              <span className="text-xs">Copy link</span>
-            </button>
           </div>
 
           {/* URL bar */}

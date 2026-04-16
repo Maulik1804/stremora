@@ -210,6 +210,49 @@ const removeBanner = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, null, 'Banner removed'));
 });
 
+/**
+ * DELETE /api/v1/users/me
+ * Delete own account, all videos, and Cloudinary assets. Requires: verifyJWT
+ * Body: { password } — must confirm password before deletion
+ */
+const deleteAccount = asyncHandler(async (req, res) => {
+  const { password } = req.body;
+  if (!password) throw new ApiError(400, 'Password is required to delete your account');
+
+  const user = await User.findById(req.user._id).select('+passwordHash');
+  if (!user) throw new ApiError(404, 'User not found');
+
+  const isMatch = await user.isPasswordCorrect(password);
+  if (!isMatch) throw new ApiError(401, 'Incorrect password');
+
+  const Video = require('../models/Video');
+
+  // Fetch all user videos for Cloudinary cleanup
+  const videos = await Video.find({ owner: user._id }).lean();
+
+  const assetDeletions = videos.flatMap((v) => {
+    const tasks = [deleteAsset(v.cloudinaryPublicId, 'video')];
+    if (v.thumbnailPublicId) tasks.push(deleteAsset(v.thumbnailPublicId, 'image'));
+    return tasks;
+  });
+  if (user.avatarPublicId) assetDeletions.push(deleteAsset(user.avatarPublicId, 'image'));
+  if (user.bannerPublicId) assetDeletions.push(deleteAsset(user.bannerPublicId, 'image'));
+
+  await Promise.allSettled(assetDeletions);
+
+  // Delete all videos and the user
+  await Promise.all([
+    Video.deleteMany({ owner: user._id }),
+    User.findByIdAndDelete(user._id),
+  ]);
+
+  // Clear refresh cookie
+  const { clearRefreshCookie } = require('../services/auth.service');
+  clearRefreshCookie(res);
+
+  return res.status(200).json(new ApiResponse(200, null, 'Account deleted successfully'));
+});
+
 module.exports = {
   getChannelProfile,
   getMe,
@@ -219,4 +262,5 @@ module.exports = {
   updateBanner,
   removeAvatar,
   removeBanner,
+  deleteAccount,
 };

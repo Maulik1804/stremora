@@ -98,6 +98,9 @@ export const useVideoPlayer = () => {
   const lastTapZone = useRef(null);
 
   const handleContainerTap = useCallback((e) => {
+    // Don't handle taps on control buttons
+    if (e?.target?.closest('button') || e?.target?.closest('[role="slider"]')) return;
+
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();

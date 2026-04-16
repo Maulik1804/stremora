@@ -175,48 +175,67 @@ export const useUpload = () => {
         console.log(`[Upload] Progress: ${progress}% (${i + 1}/${totalChunks} chunks)`);
       }
 
-      // Step 3: Finalize upload (show 90-100% progress)
-      console.log('[Upload] Finalizing upload (uploading to storage service)...');
-      setUploadProgress(90);
-      
-      try {
-        const finalRes = await videoService.finalizeChunkedUpload(uploadSessionId);
-        const createdVideo = finalRes.data.data.video;
-        setUploadedVideo(createdVideo);
-        console.log(`[Upload] Video created: ${createdVideo._id}`);
-        setUploadProgress(95);
+      // Step 3: Finalize upload — returns immediately with processing status
+      console.log('[Upload] Finalizing upload...');
+      setUploadProgress(92);
 
-        // Upload custom thumbnail if provided
-        if (thumbnailFile && createdVideo._id) {
-          console.log('[Upload] Uploading custom thumbnail...');
-          const tfd = new FormData();
-          tfd.append('thumbnail', thumbnailFile);
+      const finalRes = await videoService.finalizeChunkedUpload(uploadSessionId);
+      const createdVideo = finalRes.data.data.video;
+      console.log(`[Upload] Video record created: ${createdVideo._id} (status: ${createdVideo.status})`);
+      setUploadProgress(95);
+
+      // Upload custom thumbnail if provided
+      if (thumbnailFile && createdVideo._id) {
+        console.log('[Upload] Uploading custom thumbnail...');
+        const tfd = new FormData();
+        tfd.append('thumbnail', thumbnailFile);
+        try {
           await videoService.uploadThumbnail(createdVideo._id, tfd);
           console.log('[Upload] Thumbnail uploaded');
-        }
-
-        setUploadProgress(100);
-        setStep(UPLOAD_STEPS.SUCCESS);
-        console.log('[Upload] Upload completed successfully');
-      } catch (finalizeErr) {
-        console.error('[Upload] Finalization error:', finalizeErr.message);
-        
-        // Check if it's an auth error (token expired)
-        if (finalizeErr.response?.status === 401) {
-          throw new Error('Your session has expired during upload. Please log in again and retry the upload.');
-        }
-        
-        const errorMsg = finalizeErr.response?.data?.message || finalizeErr.message;
-        
-        // Provide helpful error messages
-        if (errorMsg.includes('timeout')) {
-          throw new Error('Upload to storage service timed out. This usually means the file is too large or your connection is slow. Please try again.');
-        } else if (errorMsg.includes('100 MB')) {
-          throw new Error('File exceeds the 100 MB limit. Please use a smaller file.');
-        } else {
-          throw new Error(`Upload failed: ${errorMsg}`);
+        } catch (thumbErr) {
+          console.warn('[Upload] Thumbnail upload failed (non-fatal):', thumbErr.message);
         }
       }
+
+      // Poll for video to become published (Cloudinary upload happens in background)
+      console.log('[Upload] Waiting for video to be processed...');
+      let publishedVideo = createdVideo;
+
+      if (createdVideo.status === 'processing') {
+        const maxAttempts = 60; // poll for up to 5 minutes
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          await new Promise((r) => setTimeout(r, 5000)); // wait 5s between polls
+
+          if (controller.signal.aborted) throw new Error('Upload cancelled');
+
+          try {
+            const statusRes = await videoService.getById(createdVideo._id);
+            const v = statusRes.data.data.video;
+            console.log(`[Upload] Poll ${attempt + 1}: status = ${v?.status}`);
+
+            if (v?.status === 'published') {
+              publishedVideo = v;
+              break;
+            }
+            if (v?.status === 'failed') {
+              throw new Error('Video processing failed on the server. Please try uploading again.');
+            }
+          } catch (pollErr) {
+            if (pollErr.message.includes('processing failed')) throw pollErr;
+            // Network error during poll — keep trying
+            console.warn('[Upload] Poll error (retrying):', pollErr.message);
+          }
+
+          // Update progress bar during processing (95 → 99)
+          const processingProgress = Math.min(99, 95 + Math.floor((attempt / maxAttempts) * 4));
+          setUploadProgress(processingProgress);
+        }
+      }
+
+      setUploadProgress(100);
+      setUploadedVideo(publishedVideo);
+      setStep(UPLOAD_STEPS.SUCCESS);
+      console.log('[Upload] Upload completed successfully');
     } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') {
         console.log('[Upload] Upload cancelled by user');
