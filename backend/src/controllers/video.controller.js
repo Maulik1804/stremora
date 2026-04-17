@@ -139,7 +139,8 @@ const getVideoById = asyncHandler(async (req, res) => {
     _id: req.params.id,
     isDeleted: false,
     status: 'published',
-  }).populate('owner', 'username displayName avatar');
+  }).populate('owner', 'username displayName avatar')
+    .populate('collaborators.user', 'username displayName avatar');
 
   if (!video) throw new ApiError(404, 'Video not found');
 
@@ -395,18 +396,19 @@ const getChannelVideos = asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 100);
   const cursor = req.query.cursor;
 
+  // Include videos owned by this user OR where they are an accepted collaborator
   const filter = {
-    owner: req.params.userId,
-    status: 'published',
-    visibility: 'public',
-    isDeleted: false,
-    ...cursorFilter(cursor),
+    $or: [
+      { owner: req.params.userId, status: 'published', visibility: 'public', isDeleted: false, ...cursorFilter(cursor) },
+      { 'collaborators': { $elemMatch: { user: req.params.userId, status: 'accepted' } }, status: 'published', visibility: 'public', isDeleted: false, ...cursorFilter(cursor) },
+    ],
   };
 
   const docs = await Video.find(filter)
     .sort({ createdAt: -1 })
     .limit(limit + 1)
     .populate('owner', 'username displayName avatar')
+    .populate('collaborators.user', 'username displayName avatar')
     .lean();
 
   const { items, nextCursor, hasMore } = paginateResult(docs, limit);

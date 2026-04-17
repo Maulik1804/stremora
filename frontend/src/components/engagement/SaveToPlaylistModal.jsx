@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Check, Lock, Globe, Loader2 } from 'lucide-react';
+import { X, Plus, Check, Lock, Globe, Loader2, Users } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { engagementService } from '../../services/engagement.service';
 import { useAuth } from '../../hooks/useAuth';
@@ -13,19 +13,33 @@ const SaveToPlaylistModal = ({ videoId, onClose }) => {
   const [creating, setCreating] = useState(false);
   const [saved, setSaved] = useState(new Set());
 
-  // Guard — should not be reachable without auth, but just in case
   if (!isAuthenticated) {
     toast.warning('Sign in to save videos to playlists');
     onClose();
     return null;
   }
 
-  const { data, isLoading } = useQuery({
+  // Own playlists
+  const { data: ownData, isLoading: ownLoading } = useQuery({
     queryKey: ['my-playlists'],
     queryFn: () => engagementService.getMyPlaylists().then((r) => r.data.data),
   });
 
-  const playlists = data?.playlists ?? [];
+  // Collaborative playlists — user can directly add to these too
+  const { data: collabData, isLoading: collabLoading } = useQuery({
+    queryKey: ['collaborative-playlists'],
+    queryFn: () => engagementService.getCollaborativePlaylists().then((r) => r.data.data),
+  });
+
+  const ownPlaylists    = ownData?.playlists ?? [];
+  const collabPlaylists = collabData?.playlists ?? [];
+  const isLoading       = ownLoading || collabLoading;
+
+  // Merge: own first, then collab (no duplicates)
+  const allPlaylists = [
+    ...ownPlaylists,
+    ...collabPlaylists.filter((cp) => !ownPlaylists.some((op) => op._id === cp._id)),
+  ];
 
   const toggleMutation = useMutation({
     mutationFn: ({ playlistId, isIn }) =>
@@ -40,9 +54,10 @@ const SaveToPlaylistModal = ({ videoId, onClose }) => {
         return next;
       });
       queryClient.invalidateQueries({ queryKey: ['my-playlists'] });
+      queryClient.invalidateQueries({ queryKey: ['collaborative-playlists'] });
       toast.success(isIn ? 'Removed from playlist' : 'Saved to playlist');
     },
-    onError: () => toast.error('Failed to update playlist'),
+    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to update playlist'),
   });
 
   const createMutation = useMutation({
@@ -84,35 +99,68 @@ const SaveToPlaylistModal = ({ videoId, onClose }) => {
           </div>
 
           {/* Playlist list */}
-          <div className="max-h-64 overflow-y-auto">
+          <div className="max-h-72 overflow-y-auto">
             {isLoading ? (
               <div className="flex justify-center py-6">
                 <Loader2 size={20} className="text-[#aaaaaa] animate-spin" />
               </div>
-            ) : playlists.length === 0 ? (
+            ) : allPlaylists.length === 0 ? (
               <p className="text-sm text-[#606060] text-center py-6">No playlists yet</p>
             ) : (
-              playlists.map((pl) => {
-                const isIn = saved.has(pl._id) ||
-                  (pl.videos ?? []).some((v) => (v._id ?? v) === videoId);
-                return (
-                  <button
-                    key={pl._id}
-                    onClick={() => toggleMutation.mutate({ playlistId: pl._id, isIn })}
-                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#272727] transition-colors"
-                  >
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors
-                      ${isIn ? 'bg-[#3ea6ff] border-[#3ea6ff]' : 'border-[#606060]'}`}
+              <>
+                {/* Own playlists */}
+                {ownPlaylists.map((pl) => {
+                  const isIn = saved.has(pl._id) ||
+                    (pl.videos ?? []).some((v) => (v._id ?? v) === videoId);
+                  return (
+                    <button
+                      key={pl._id}
+                      onClick={() => toggleMutation.mutate({ playlistId: pl._id, isIn })}
+                      className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#272727] transition-colors"
                     >
-                      {isIn && <Check size={10} className="text-white" />}
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors
+                        ${isIn ? 'bg-[#3ea6ff] border-[#3ea6ff]' : 'border-[#606060]'}`}
+                      >
+                        {isIn && <Check size={10} className="text-white" />}
+                      </div>
+                      <span className="text-sm text-[#f1f1f1] flex-1 text-left truncate">{pl.title}</span>
+                      {pl.visibility === 'private'
+                        ? <Lock size={12} className="text-[#606060] flex-shrink-0" />
+                        : <Globe size={12} className="text-[#606060] flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+
+                {/* Collaborative playlists */}
+                {collabPlaylists.length > 0 && (
+                  <>
+                    <div className="px-5 py-2 border-t border-[#2a2a2a]">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[#444] flex items-center gap-1.5">
+                        <Users size={10} /> Collaborative
+                      </p>
                     </div>
-                    <span className="text-sm text-[#f1f1f1] flex-1 text-left truncate">{pl.title}</span>
-                    {pl.visibility === 'private'
-                      ? <Lock size={12} className="text-[#606060] flex-shrink-0" />
-                      : <Globe size={12} className="text-[#606060] flex-shrink-0" />}
-                  </button>
-                );
-              })
+                    {collabPlaylists.map((pl) => {
+                      const isIn = saved.has(pl._id) ||
+                        (pl.videos ?? []).some((v) => (v._id ?? v) === videoId);
+                      return (
+                        <button
+                          key={pl._id}
+                          onClick={() => toggleMutation.mutate({ playlistId: pl._id, isIn })}
+                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#272727] transition-colors"
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors
+                            ${isIn ? 'bg-[#3ea6ff] border-[#3ea6ff]' : 'border-[#606060]'}`}
+                          >
+                            {isIn && <Check size={10} className="text-white" />}
+                          </div>
+                          <span className="text-sm text-[#f1f1f1] flex-1 text-left truncate">{pl.title}</span>
+                          <Users size={11} className="text-[#3ea6ff] flex-shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
+              </>
             )}
           </div>
 

@@ -36,6 +36,7 @@ export const engagementService = {
   // Collaborator invite flow
   addCollaborator:      (id, usernameOrEmail) => api.post(`/playlists/${id}/collaborators`, { usernameOrEmail }),
   removeCollaborator:   (id, userId)    => api.delete(`/playlists/${id}/collaborators/${userId}`),
+  leavePlaylist:        (id)            => api.post(`/playlists/${id}/collaborators/leave`),
   getCollaborators:     (id)            => api.get(`/playlists/${id}/collaborators`),
   getPendingInvites:    ()              => api.get('/playlists/invites/pending'),
   acceptCollabInvite:   (id)            => api.post(`/playlists/${id}/collaborators/accept`),
@@ -63,8 +64,10 @@ export const engagementService = {
   toggleHistoryPause: ()        => api.patch('/history/pause'),
 
   // Notifications
-  getNotifications:    (cursor) => api.get('/notifications', { params: { cursor } }),
-  getUnreadCount:      ()       => api.get('/notifications/unread-count'),
-  markRead:            (id)     => api.patch(`/notifications/${id}/read`),
-  markAllRead:         ()       => api.patch('/notifications/read-all'),
+  getNotifications:       (cursor) => api.get('/notifications', { params: { cursor } }),
+  getUnreadCount:         ()       => api.get('/notifications/unread-count'),
+  markRead:               (id)     => api.patch(`/notifications/${id}/read`),
+  markAllRead:            ()       => api.patch('/notifications/read-all'),
+  deleteNotification:     (id)     => api.delete(`/notifications/${id}`),
+  clearAllNotifications:  ()       => api.delete('/notifications'),
 };

@@ -24,6 +24,16 @@ const {
   saveVideo,
 } = require('../controllers/video.controller');
 
+const {
+  inviteCollaborator,
+  acceptCollabInvite,
+  declineCollabInvite,
+  removeCollaborator: removeVideoCollaborator,
+  leaveCollab,
+  getMyCollabVideos,
+  getMyVideoCollabInvites,
+} = require('../controllers/videoCollab.controller');
+
 const verifyJWT = require('../middlewares/auth.middleware');
 const optionalJWT = require('../middlewares/optionalAuth.middleware');
 const validate = require('../middlewares/validate.middleware');
@@ -44,6 +54,11 @@ router.get('/subscriptions/feed', verifyJWT, getSubscriptionFeed);
 
 // Creator-only: own videos (Studio / Dashboard)
 router.get('/mine', verifyJWT, getMyVideos);
+
+// Collab videos where user is an accepted collaborator
+router.get('/collab/mine', verifyJWT, getMyCollabVideos);
+// Pending video collab invites for current user
+router.get('/collab/invites', verifyJWT, getMyVideoCollabInvites);
 
 // Public: all videos for a specific channel
 router.get('/channel/:userId', getChannelVideos);
@@ -100,5 +115,14 @@ router.patch(
 );
 
 router.delete('/:id', verifyJWT, deleteVideo);
+
+// ── Collab video routes ───────────────────────────────────────────────────────
+router.post('/:id/collab/invite', verifyJWT, [
+  body('usernameOrEmail').trim().notEmpty().withMessage('usernameOrEmail is required'),
+], validate, inviteCollaborator);
+router.post('/:id/collab/accept', verifyJWT, acceptCollabInvite);
+router.post('/:id/collab/decline', verifyJWT, declineCollabInvite);
+router.post('/:id/collab/leave', verifyJWT, leaveCollab);
+router.delete('/:id/collab/:userId', verifyJWT, removeVideoCollaborator);
 
 module.exports = router;

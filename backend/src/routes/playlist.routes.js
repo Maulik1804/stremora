@@ -16,6 +16,7 @@ const {
   acceptCollabInvite,
   declineCollabInvite,
   removeCollaborator,
+  leavePlaylist,
   getCollaborators,
   getPendingInvites,
   proposeCollabVideo,
@@ -92,6 +93,7 @@ router.post('/:id/collaborators', verifyJWT, [
 ], validate, addCollaborator);
 router.post('/:id/collaborators/accept', verifyJWT, acceptCollabInvite);
 router.post('/:id/collaborators/decline', verifyJWT, declineCollabInvite);
+router.post('/:id/collaborators/leave', verifyJWT, leavePlaylist);
 router.delete('/:id/collaborators/:userId', verifyJWT, removeCollaborator);
 
 // Collab video requests

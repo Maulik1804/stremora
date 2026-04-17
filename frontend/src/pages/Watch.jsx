@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ThumbsUp, ThumbsDown, Share2, BookmarkPlus,
-  ChevronDown, ChevronUp, Bell, BellOff, Headphones, Minimize2,
+  ChevronDown, ChevronUp, Bell, BellOff, Headphones, Minimize2, Users,
 } from 'lucide-react';
 
 import VideoPlayer from '../components/video/VideoPlayer';
@@ -12,6 +12,7 @@ import SuggestedVideos from '../components/video/SuggestedVideos';
 import CommentsSection from '../components/engagement/CommentsSection';
 import ShareModal from '../components/engagement/ShareModal';
 import SaveToPlaylistModal from '../components/engagement/SaveToPlaylistModal';
+import VideoCollabModal from '../components/video/VideoCollabModal';
 import TimestampComments from '../components/features/TimestampComments';
 import PinnedComment from '../components/features/PinnedComment';
 import FocusModeToggle from '../components/features/FocusModeToggle';
@@ -45,6 +46,7 @@ const Watch = () => {
   const [subscribed, setSubscribed] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showSave, setShowSave] = useState(false);
+  const [showCollab, setShowCollab] = useState(false);
   const [audioOnly, setAudioOnly] = useState(false);
   const viewRecorded = useRef(false);
   const progressSaveTimer = useRef(null);            // Feature 10
@@ -53,6 +55,8 @@ const Watch = () => {
   const { data: video, isLoading, isError } = useQuery({
     queryKey: ['video', id],
     queryFn: () => videoService.getById(id).then((r) => r.data.data.video),
+    staleTime: 0,        // always fetch fresh — collaborators change
+    refetchOnMount: true,
   });
 
   // Derive subscriberCount directly from video data (never stale)
@@ -277,6 +281,13 @@ const Watch = () => {
       {showSave && isAuthenticated && (
         <SaveToPlaylistModal videoId={id} onClose={() => setShowSave(false)} />
       )}
+      {showCollab && video.owner?._id === me?._id && (
+        <VideoCollabModal
+          videoId={id}
+          videoTitle={video.title}
+          onClose={() => setShowCollab(false)}
+        />
+      )}
 
 
       <div className="px-4 py-6 max-w-screen-xl mx-auto">
@@ -300,18 +311,45 @@ const Watch = () => {
 
             {/* Channel row + actions */}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-              {/* Channel */}
-              <div className="flex items-center gap-3">
-                <Link to={`/channel/${video.owner?.username}`}>
-                  <Avatar src={video.owner?.avatar} alt={video.owner?.displayName} size="md" />
-                </Link>
-                <div>
-                  <Link
-                    to={`/channel/${video.owner?.username}`}
-                    className="text-sm font-semibold text-[#f1f1f1] hover:text-white"
-                  >
-                    {video.owner?.displayName || video.owner?.username}
+              {/* Channel — show owner + accepted collaborators */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Avatars — stacked if collab */}
+                <div className="flex items-center">
+                  <Link to={`/channel/${video.owner?.username}`}>
+                    <Avatar src={video.owner?.avatar} alt={video.owner?.displayName} size="md" />
                   </Link>
+                  {video.collaborators?.filter((c) => c.status === 'accepted').map((c, i) => (
+                    <Link key={c.user?._id} to={`/channel/${c.user?.username}`} className="-ml-2">
+                      <Avatar
+                        src={c.user?.avatar}
+                        alt={c.user?.displayName}
+                        size="md"
+                        className="ring-2 ring-[#080808]"
+                      />
+                    </Link>
+                  ))}
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Link
+                      to={`/channel/${video.owner?.username}`}
+                      className="text-sm font-semibold text-[#f1f1f1] hover:text-white transition-colors"
+                    >
+                      {video.owner?.displayName || video.owner?.username}
+                    </Link>
+                    {/* Accepted collaborators */}
+                    {video.collaborators?.filter((c) => c.status === 'accepted').map((c) => (
+                      <span key={c.user?._id} className="flex items-center gap-1">
+                        <span className="text-[#444] text-xs font-medium">&amp;</span>
+                        <Link
+                          to={`/channel/${c.user?.username}`}
+                          className="text-sm font-semibold text-[#3ea6ff] hover:text-[#6bbfff] transition-colors"
+                        >
+                          {c.user?.displayName || c.user?.username}
+                        </Link>
+                      </span>
+                    ))}
+                  </div>
                   <p className="text-xs text-[#aaaaaa]">
                     {formatCount(subscriberCount)} subscribers
                   </p>
@@ -398,6 +436,32 @@ const Watch = () => {
 
                 {/* Focus Mode toggle */}
                 <FocusModeToggle />
+
+                {/* Collab — owner can invite, accepted collaborator can leave */}
+                {isAuthenticated && video.owner?._id === me?._id && (
+                  <Button variant="secondary" size="sm" onClick={() => setShowCollab(true)}>
+                    <Users size={15} /> Collab
+                  </Button>
+                )}
+                {isAuthenticated && video.owner?._id !== me?._id &&
+                  video.collaborators?.some((c) => c.user?._id === me?._id && c.status === 'accepted') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="text-red-400 border-red-500/20"
+                    onClick={async () => {
+                      try {
+                        await videoService.leaveCollab(id);
+                        queryClient.invalidateQueries({ queryKey: ['video', id] });
+                        toast.success('You have left the collab');
+                      } catch (err) {
+                        toast.error(err?.response?.data?.message || 'Failed to leave');
+                      }
+                    }}
+                  >
+                    Leave collab
+                  </Button>
+                )}
               </div>
             </div>
 

@@ -1,12 +1,13 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Bell, CheckCheck, PlaySquare, MessageSquare, Users, Heart, Star } from 'lucide-react';
+import { Bell, CheckCheck, PlaySquare, MessageSquare, Users, Heart, Star, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Spinner from '../components/ui/Spinner';
 import Button from '../components/ui/Button';
 import { engagementService } from '../services/engagement.service';
 import { formatDistanceToNow } from '../utils/date';
+import { toast } from '../components/ui/Toast';
 
 const TYPE_META = {
   new_video:              { icon: PlaySquare,    color: 'text-[#ff0000]',    bg: 'bg-[#ff0000]/10' },
@@ -20,9 +21,12 @@ const TYPE_META = {
   collab_video_request:   { icon: PlaySquare,    color: 'text-yellow-400',   bg: 'bg-yellow-900/20' },
   collab_video_approved:  { icon: PlaySquare,    color: 'text-green-400',    bg: 'bg-green-900/20' },
   collab_video_rejected:  { icon: PlaySquare,    color: 'text-red-400',      bg: 'bg-red-900/20' },
+  video_collab_invite:    { icon: Users,         color: 'text-[#3ea6ff]',    bg: 'bg-[#3ea6ff]/10' },
+  video_collab_accepted:  { icon: Users,         color: 'text-green-400',    bg: 'bg-green-900/20' },
+  video_collab_declined:  { icon: Users,         color: 'text-[#aaaaaa]',    bg: 'bg-[#272727]' },
 };
 
-const NotificationItem = ({ notification, onRead }) => {
+const NotificationItem = ({ notification, onRead, onDelete }) => {
   const meta = TYPE_META[notification.type] ?? { icon: Bell, color: 'text-[#aaaaaa]', bg: 'bg-[#272727]' };
   const Icon = meta.icon;
 
@@ -65,10 +69,19 @@ const NotificationItem = ({ notification, onRead }) => {
         </p>
       </div>
 
-      {/* Unread dot */}
-      {!notification.isRead && (
-        <div className="w-2 h-2 rounded-full bg-[#3ea6ff] flex-shrink-0 mt-1.5" />
-      )}
+      {/* Right side: unread dot + delete */}
+      <div className="flex flex-col items-end gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        {!notification.isRead && (
+          <div className="w-2 h-2 rounded-full bg-[#3ea6ff]" />
+        )}
+        <button
+          onClick={() => onDelete(notification._id)}
+          className="p-1 rounded-lg text-[#606060] hover:text-red-400 hover:bg-red-400/10 transition-colors"
+          title="Delete notification"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
     </motion.div>
   );
 
@@ -113,6 +126,16 @@ const Notifications = () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
     },
+  });
+
+  const deleteNotificationMutation = useMutation({
+    mutationFn: (id) => engagementService.deleteNotification(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+      toast.success('Notification deleted');
+    },
+    onError: () => toast.error('Failed to delete notification'),
   });
 
   const notifications = data?.pages.flatMap((p) => p.notifications) ?? [];
@@ -175,6 +198,7 @@ const Notifications = () => {
               key={n._id}
               notification={n}
               onRead={(id) => markReadMutation.mutate(id)}
+              onDelete={(id) => deleteNotificationMutation.mutate(id)}
             />
           ))}
         </div>

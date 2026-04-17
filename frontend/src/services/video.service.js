@@ -48,6 +48,15 @@ export const videoService = {
   uploadThumbnail: (id, formData) =>
     api.post(`/videos/${id}/thumbnail`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 60000, // 1 minute for thumbnail
+      timeout: 60000,
     }),
+
+  // ── Collab video ────────────────────────────────────────────────────────────
+  inviteCollaborator:   (id, usernameOrEmail) => api.post(`/videos/${id}/collab/invite`, { usernameOrEmail }),
+  acceptCollabInvite:   (id) => api.post(`/videos/${id}/collab/accept`),
+  declineCollabInvite:  (id) => api.post(`/videos/${id}/collab/decline`),
+  leaveCollab:          (id) => api.post(`/videos/${id}/collab/leave`),
+  removeCollaborator:   (id, userId) => api.delete(`/videos/${id}/collab/${userId}`),
+  getMyCollabVideos:    () => api.get('/videos/collab/mine'),
+  getMyVideoCollabInvites: () => api.get('/videos/collab/invites'),
 };

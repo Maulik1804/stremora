@@ -263,13 +263,25 @@ const declineCollabInvite = asyncHandler(async (req, res) => {
  * Remove a collaborator or cancel a pending invite. Owner only. Requires: verifyJWT
  */
 const removeCollaborator = asyncHandler(async (req, res) => {
-  const playlist = await Playlist.findOne({ _id: req.params.id });
+  const playlist = await Playlist.findOne({ _id: req.params.id })
+    .populate('owner', 'username displayName');
   if (!playlist) throw new ApiError(404, 'Playlist not found');
-  if (!playlist.owner.equals(req.user._id)) throw new ApiError(403, 'Only the owner can remove collaborators');
+  if (!playlist.owner._id.equals(req.user._id)) throw new ApiError(403, 'Only the owner can remove collaborators');
 
   playlist.collaborators = playlist.collaborators.filter((c) => !c.equals(req.params.userId));
   playlist.pendingCollaborators = playlist.pendingCollaborators.filter((p) => !p.user.equals(req.params.userId));
   await playlist.save();
+
+  // Notify the removed user
+  const { createNotification } = require('./notification.controller');
+  await createNotification({
+    recipient: req.params.userId,
+    type: 'collab_invite_declined', // closest existing type for "removed"
+    actor: req.user._id,
+    resourceId: playlist._id,
+    resourceType: 'playlist',
+    message: `${playlist.owner.displayName || playlist.owner.username} removed you from the collaborative playlist "${playlist.title}"`,
+  });
 
   return res.status(200).json(new ApiResponse(200, null, 'Collaborator removed'));
 });
@@ -450,9 +462,43 @@ const getCollabVideoRequests = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /api/v1/playlists/collaborative
- * Get playlists where the user is a collaborator. Requires: verifyJWT
+ * POST /api/v1/playlists/:id/leave
+ * Collaborator removes themselves from a playlist. Requires: verifyJWT
  */
+const leavePlaylist = asyncHandler(async (req, res) => {
+  const playlist = await Playlist.findById(req.params.id)
+    .populate('owner', 'username displayName');
+  if (!playlist) throw new ApiError(404, 'Playlist not found');
+
+  // Owner cannot leave their own playlist
+  if (playlist.owner._id.equals(req.user._id)) {
+    throw new ApiError(400, 'You are the owner — delete the playlist instead');
+  }
+
+  const wasCollaborator = playlist.collaborators.some((c) => c.equals(req.user._id));
+  const wasPending = playlist.pendingCollaborators.some((p) => p.user.equals(req.user._id));
+
+  if (!wasCollaborator && !wasPending) {
+    throw new ApiError(400, 'You are not a collaborator on this playlist');
+  }
+
+  playlist.collaborators = playlist.collaborators.filter((c) => !c.equals(req.user._id));
+  playlist.pendingCollaborators = playlist.pendingCollaborators.filter((p) => !p.user.equals(req.user._id));
+  await playlist.save();
+
+  // Notify the owner
+  const { createNotification } = require('./notification.controller');
+  await createNotification({
+    recipient: playlist.owner._id,
+    type: 'new_subscriber', // reuse existing type
+    actor: req.user._id,
+    resourceId: playlist._id,
+    resourceType: 'playlist',
+    message: `${req.user.displayName || req.user.username} left your collaborative playlist "${playlist.title}"`,
+  });
+
+  return res.status(200).json(new ApiResponse(200, null, 'You have left the playlist'));
+});
 const getCollaborativePlaylists = asyncHandler(async (req, res) => {
   const playlists = await Playlist.find({ collaborators: req.user._id })
     .populate('owner', 'username displayName avatar')
@@ -579,6 +625,7 @@ module.exports = {
   acceptCollabInvite,
   declineCollabInvite,
   removeCollaborator,
+  leavePlaylist,
   getCollaborators,
   getPendingInvites,
   proposeCollabVideo,

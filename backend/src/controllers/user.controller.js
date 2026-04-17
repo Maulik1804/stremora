@@ -34,9 +34,34 @@ const sanitizeUser = (user) => ({
 // ── Controllers ───────────────────────────────────────────────────────────────
 
 /**
- * GET /api/v1/users/:username
- * Public channel profile.
+ * GET /api/v1/users/search?q=
+ * Search users by username or displayName (case-insensitive, min 1 char).
+ * Returns up to 10 results. Requires: verifyJWT
  */
+const searchUsers = asyncHandler(async (req, res) => {
+  const { q } = req.query;
+  if (!q || q.trim().length === 0) {
+    return res.status(200).json(new ApiResponse(200, { users: [] }));
+  }
+
+  // Escape special regex chars, then match anywhere case-insensitively
+  const escaped = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escaped, 'i');
+
+  const users = await User.find({
+    $or: [
+      { username: regex },
+      { displayName: regex },
+    ],
+    _id: { $ne: req.user._id }, // exclude self
+    isSuspended: false,
+  })
+    .select('username displayName avatar')
+    .limit(10)
+    .lean();
+
+  return res.status(200).json(new ApiResponse(200, { users }));
+});
 const getChannelProfile = asyncHandler(async (req, res) => {
   const user = await User.findOne({
     username: req.params.username.toLowerCase(),
@@ -251,32 +276,6 @@ const deleteAccount = asyncHandler(async (req, res) => {
   clearRefreshCookie(res);
 
   return res.status(200).json(new ApiResponse(200, null, 'Account deleted successfully'));
-});
-
-/**
- * GET /api/v1/users/search?q=...
- * Search users by username or displayName (case-insensitive, partial match).
- * Requires: verifyJWT
- */
-const searchUsers = asyncHandler(async (req, res) => {
-  const { q } = req.query;
-  if (!q || q.trim().length < 1) {
-    return res.status(200).json(new ApiResponse(200, { users: [] }));
-  }
-
-  const escaped = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(escaped, 'i'); // case-insensitive, matches anywhere
-
-  const users = await User.find({
-    $or: [{ username: regex }, { displayName: regex }],
-    isSuspended: false,
-    _id: { $ne: req.user._id }, // exclude self
-  })
-    .select('username displayName avatar')
-    .limit(8)
-    .lean();
-
-  return res.status(200).json(new ApiResponse(200, { users }));
 });
 
 module.exports = {

@@ -7,6 +7,7 @@ import Spinner from '../components/ui/Spinner';
 import Button from '../components/ui/Button';
 import { engagementService } from '../services/engagement.service';
 import api from '../services/api';
+import { toast } from '../components/ui/Toast';
 
 // ── Create playlist modal ─────────────────────────────────────────────────────
 const CreateModal = ({ onClose, onCreated }) => {
@@ -83,7 +84,7 @@ const CreateModal = ({ onClose, onCreated }) => {
 };
 
 // ── Playlist card ─────────────────────────────────────────────────────────────
-const PlaylistCard = ({ playlist, onDelete, showOwner = false }) => {
+const PlaylistCard = ({ playlist, onDelete, onLeave, showOwner = false }) => {
   const isWatchLater = playlist.isWatchLater;
   const count = playlist.videos?.length ?? 0;
 
@@ -158,6 +159,17 @@ const PlaylistCard = ({ playlist, onDelete, showOwner = false }) => {
               <Trash2 size={14} />
             </button>
           )}
+          {/* Leave — only for collaborative playlists (showOwner = true means it's a collab card) */}
+          {showOwner && onLeave && (
+            <button
+              onClick={() => onLeave(playlist._id)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded-lg
+                         text-xs text-red-400 hover:bg-red-900/20 transition-colors"
+              aria-label="Leave playlist"
+            >
+              Leave
+            </button>
+          )}
         </div>
       </div>
     </motion.div>
@@ -185,6 +197,15 @@ const Playlists = () => {
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/playlists/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-playlists'] }),
+  });
+
+  const leaveMutation = useMutation({
+    mutationFn: (id) => engagementService.leavePlaylist(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['collaborative-playlists'] });
+      toast.success('You have left the playlist');
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to leave playlist'),
   });
 
   const playlists     = data?.playlists ?? [];
@@ -284,6 +305,7 @@ const Playlists = () => {
                 key={pl._id}
                 playlist={pl}
                 onDelete={(id) => deleteMutation.mutate(id)}
+                onLeave={tab === 'collaborative' ? (id) => leaveMutation.mutate(id) : undefined}
                 showOwner={tab === 'collaborative'}
               />
             ))}

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Search, X, Upload, Bell, LogIn, TrendingUp, Clock, Tv2, Clapperboard, LayoutDashboard, Settings, LogOut } from 'lucide-react';
+import { Menu, Search, X, Upload, Bell, LogIn, TrendingUp, Clock, Tv2, Clapperboard, LayoutDashboard, Settings, LogOut, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useSidebar } from '../../hooks/useSidebar';
@@ -11,6 +11,7 @@ import Avatar from '../ui/Avatar';
 import SurpriseButton from '../features/SurpriseButton';
 import { formatCount } from '../../utils/format';
 import { engagementService } from '../../services/engagement.service';
+import { videoService } from '../../services/video.service';
 
 
 // ── Recent searches (localStorage) ───────────────────────────────────────────
@@ -257,6 +258,16 @@ const Navbar = () => {
   });
   const unreadCount = unreadData ?? 0;
 
+  // Poll pending collab invite count every 30 seconds
+  const { data: collabInviteData } = useQuery({
+    queryKey: ['video-collab-invites', 'count'],
+    queryFn: () => videoService.getMyVideoCollabInvites().then((r) => r.data.data.videos?.length ?? 0),
+    enabled: isAuthenticated,
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+  });
+  const collabInviteCount = collabInviteData ?? 0;
+
   useEffect(() => {
     const handler = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) setShowUserMenu(false);
@@ -321,6 +332,21 @@ const Navbar = () => {
                                    bg-[#ff0000] text-white text-[10px] font-bold rounded-full
                                    flex items-center justify-center ring-2 ring-[#080808]">
                     {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </motion.button>
+            </Link>
+
+            {/* Collab invite badge */}
+            <Link to="/collab-invites">
+              <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
+                className="relative p-2 rounded-xl hover:bg-white/6 transition-colors" aria-label="Collab Invites">
+                <Users size={19} className="text-[#f0f0f0]" />
+                {collabInviteCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1
+                                   bg-[#3ea6ff] text-white text-[10px] font-bold rounded-full
+                                   flex items-center justify-center ring-2 ring-[#080808]">
+                    {collabInviteCount > 99 ? '99+' : collabInviteCount}
                   </span>
                 )}
               </motion.button>

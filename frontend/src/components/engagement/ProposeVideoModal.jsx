@@ -71,15 +71,15 @@ const ProposeVideoModal = ({ playlistId, playlistTitle, onClose }) => {
       (search.trim() === '' || v.title.toLowerCase().includes(search.toLowerCase()))
   );
 
-  // Propose mutation
-  const proposeMutation = useMutation({
-    mutationFn: (videoId) => engagementService.proposeCollabVideo(playlistId, videoId),
+  // Direct add mutation (collaborators can add directly — no approval needed)
+  const addMutation = useMutation({
+    mutationFn: (videoId) => engagementService.addToPlaylist(playlistId, videoId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['collab-requests', playlistId] });
-      toast.success('Video proposed! Waiting for owner approval.');
+      queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
+      toast.success('Video added to playlist!');
       onClose();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Failed to propose video'),
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to add video'),
   });
 
   // ── File validation ───────────────────────────────────────────────────────
@@ -168,15 +168,15 @@ const ProposeVideoModal = ({ playlistId, playlistTitle, onClose }) => {
 
       const savedVideo = saveRes.data.data.video;
       setUploadProgress(96);
-      setUploadLabel('Proposing to playlist…');
+      setUploadLabel('Adding to playlist…');
 
-      // 4. Propose the newly uploaded video
-      await engagementService.proposeCollabVideo(playlistId, savedVideo._id);
+      // 4. Add the newly uploaded video directly to the playlist
+      await engagementService.addToPlaylist(playlistId, savedVideo._id);
       setUploadProgress(100);
       setUploadStep('done');
 
-      queryClient.invalidateQueries({ queryKey: ['collab-requests', playlistId] });
-      toast.success('Video uploaded and proposed! Waiting for owner approval.');
+      queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
+      toast.success('Video uploaded and added to playlist!');
       setTimeout(onClose, 1200);
 
     } catch (err) {
@@ -207,9 +207,9 @@ const ProposeVideoModal = ({ playlistId, playlistTitle, onClose }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-[#2a2a2a] flex-shrink-0">
           <div>
-            <h3 className="text-base font-semibold text-[#f1f1f1]">Propose a video</h3>
+            <h3 className="text-base font-semibold text-[#f1f1f1]">Add a video</h3>
             <p className="text-xs text-[#606060] mt-0.5">
-              for <span className="text-[#aaa]">"{playlistTitle}"</span>
+              to <span className="text-[#aaa]">"{playlistTitle}"</span>
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-[#272727] text-[#aaa]">
@@ -323,8 +323,8 @@ const ProposeVideoModal = ({ playlistId, playlistTitle, onClose }) => {
                     <div className="w-14 h-14 rounded-2xl bg-green-900/20 border border-green-900/30 flex items-center justify-center">
                       <CheckCircle2 size={28} className="text-green-400" />
                     </div>
-                    <p className="text-sm font-semibold text-[#f1f1f1]">Proposed successfully!</p>
-                    <p className="text-xs text-[#555]">Waiting for the playlist owner to approve.</p>
+                    <p className="text-sm font-semibold text-[#f1f1f1]">Added successfully!</p>
+                    <p className="text-xs text-[#555]">The video is now in the playlist.</p>
                   </div>
                 ) : uploadStep === 'uploading' ? (
                   <div className="flex flex-col gap-5 py-6">
@@ -431,12 +431,12 @@ const ProposeVideoModal = ({ playlistId, playlistTitle, onClose }) => {
               <Button
                 variant="primary"
                 size="md"
-                onClick={() => selectedVideoId && proposeMutation.mutate(selectedVideoId)}
+                onClick={() => selectedVideoId && addMutation.mutate(selectedVideoId)}
                 disabled={!selectedVideoId}
-                loading={proposeMutation.isPending}
+                loading={addMutation.isPending}
                 className="flex-1"
               >
-                Propose video
+                Add to playlist
               </Button>
             ) : (
               <Button
@@ -447,7 +447,7 @@ const ProposeVideoModal = ({ playlistId, playlistTitle, onClose }) => {
                 className="flex-1"
               >
                 <Upload size={14} />
-                Upload &amp; propose
+                Upload &amp; add
               </Button>
             )}
           </div>

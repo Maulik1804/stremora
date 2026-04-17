@@ -127,6 +127,16 @@ const videoSchema = new mongoose.Schema(
       type: [{ word: String, timestamp: Number }],
       default: [],
     },
+
+    // ── Collab video ──────────────────────────────────────────────────────────
+    // Users tagged as collaborators on this video (like Instagram/YouTube collab)
+    collaborators: [
+      {
+        user:      { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        status:    { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
+        invitedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -136,5 +146,6 @@ videoSchema.index({ status: 1, visibility: 1, isDeleted: 1, createdAt: -1 });
 videoSchema.index({ owner: 1, isDeleted: 1, createdAt: -1 });
 videoSchema.index({ viewCount: -1, createdAt: -1 }); // trending
 videoSchema.index({ title: 'text', description: 'text', tags: 'text' }); // full-text search
+videoSchema.index({ 'collaborators.user': 1, 'collaborators.status': 1 }); // collab lookup
 
 module.exports = mongoose.model('Video', videoSchema);

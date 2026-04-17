@@ -4,11 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ListVideo, Lock, Globe, Users, Trash2, Play, Film,
-  CheckCircle2, XCircle, Clock, PlusCircle,
+  CheckCircle2, XCircle, Clock,
 } from 'lucide-react';
 import { engagementService } from '../services/engagement.service';
 import CollaboratorModal from '../components/engagement/CollaboratorModal';
-import ProposeVideoModal from '../components/engagement/ProposeVideoModal';
 import VideoCard from '../components/video/VideoCard';
 import Spinner from '../components/ui/Spinner';
 import Button from '../components/ui/Button';
@@ -22,7 +21,6 @@ const PlaylistDetail = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showCollaborators, setShowCollaborators] = useState(false);
-  const [showProposeVideo, setShowProposeVideo] = useState(false);
 
   const { data: playlist, isLoading, isError } = useQuery({
     queryKey: ['playlist', id],
@@ -65,6 +63,17 @@ const PlaylistDetail = () => {
     onError: () => toast.error('Failed to reject video'),
   });
 
+  const leavePlaylistMutation = useMutation({
+    mutationFn: () => engagementService.leavePlaylist(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['collaborative-playlists'] });
+      queryClient.invalidateQueries({ queryKey: ['my-playlists'] });
+      toast.success('You have left the playlist');
+      window.history.back();
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to leave playlist'),
+  });
+
   if (isLoading) return (
     <div className="flex justify-center items-center min-h-[60vh]"><Spinner size="lg" /></div>
   );
@@ -104,14 +113,6 @@ const PlaylistDetail = () => {
             playlistId={id}
             playlistTitle={playlist.title}
             onClose={() => setShowCollaborators(false)}
-          />
-        )}
-        {/* Propose video — for collaborators */}
-        {showProposeVideo && isCollaborator && !isChannelPlaylist && (
-          <ProposeVideoModal
-            playlistId={id}
-            playlistTitle={playlist.title}
-            onClose={() => setShowProposeVideo(false)}
           />
         )}
       </AnimatePresence>
@@ -198,16 +199,16 @@ const PlaylistDetail = () => {
                   </div>
                 )}
 
-                {/* Propose video button — for collaborators */}
+                {/* Leave playlist — for collaborators only */}
                 {isCollaborator && !isChannelPlaylist && (
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => setShowProposeVideo(true)}
-                    className="w-full rounded-xl"
+                    onClick={() => leavePlaylistMutation.mutate()}
+                    loading={leavePlaylistMutation.isPending}
+                    className="w-full rounded-xl text-red-400 hover:text-red-300 border-red-500/20 hover:border-red-500/40"
                   >
-                    <PlusCircle size={14} />
-                    Propose a video
+                    Leave playlist
                   </Button>
                 )}
 
