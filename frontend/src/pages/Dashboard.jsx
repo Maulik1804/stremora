@@ -109,7 +109,7 @@ const VideoCard = ({ video }) => (
         </span>
       </div>
     </div>
-    <Link to={`/studio/edit/${video._id}`} className="text-xs text-[#3ea6ff] flex-shrink-0 hover:underline">Edit</Link>
+   
   </div>
 );
 
