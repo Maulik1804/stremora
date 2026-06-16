@@ -1,15 +1,15 @@
-'use strict';
+"use strict";
 
-const bcrypt = require('bcrypt');
-const User = require('../models/User');
-const asyncHandler = require('../utils/asyncHandler');
-const ApiError = require('../utils/ApiError');
-const ApiResponse = require('../utils/ApiResponse');
+const bcrypt = require("bcrypt");
+const User = require("../models/User");
+const asyncHandler = require("../utils/asyncHandler");
+const ApiError = require("../utils/ApiError");
+const ApiResponse = require("../utils/ApiResponse");
 const {
   uploadAvatar,
   uploadBanner,
   deleteAsset,
-} = require('../services/cloudinary.service');
+} = require("../services/cloudinary.service");
 
 const BCRYPT_COST = 12;
 
@@ -45,18 +45,15 @@ const searchUsers = asyncHandler(async (req, res) => {
   }
 
   // Escape special regex chars, then match anywhere case-insensitively
-  const escaped = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(escaped, 'i');
+  const escaped = q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(escaped, "i");
 
   const users = await User.find({
-    $or: [
-      { username: regex },
-      { displayName: regex },
-    ],
+    $or: [{ username: regex }, { displayName: regex }],
     _id: { $ne: req.user._id }, // exclude self
     isSuspended: false,
   })
-    .select('username displayName avatar')
+    .select("username displayName avatar")
     .limit(10)
     .lean();
 
@@ -66,13 +63,17 @@ const getChannelProfile = asyncHandler(async (req, res) => {
   const user = await User.findOne({
     username: req.params.username.toLowerCase(),
     isSuspended: false,
-  }).select('username displayName avatar banner bio role createdAt');
+  })
+    .select("username displayName avatar banner bio role createdAt")
+    .lean();
 
-  if (!user) throw new ApiError(404, 'Channel not found');
+  if (!user) throw new ApiError(404, "Channel not found");
 
   // Attach subscriber count via aggregation
-  const Subscription = require('../models/Subscription');
-  const subscriberCount = await Subscription.countDocuments({ channel: user._id });
+  const Subscription = require("../models/Subscription");
+  const subscriberCount = await Subscription.countDocuments({
+    channel: user._id,
+  });
 
   // Check if the requesting user is subscribed
   let isSubscribed = false;
@@ -84,9 +85,13 @@ const getChannelProfile = asyncHandler(async (req, res) => {
     isSubscribed = !!sub;
   }
 
-  return res.status(200).json(
-    new ApiResponse(200, { channel: { ...user.toObject(), subscriberCount, isSubscribed } })
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, {
+        channel: { ...user, subscriberCount, isSubscribed },
+      }),
+    );
 });
 
 /**
@@ -95,8 +100,10 @@ const getChannelProfile = asyncHandler(async (req, res) => {
  */
 const getMe = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
-  if (!user) throw new ApiError(404, 'User not found');
-  return res.status(200).json(new ApiResponse(200, { user: sanitizeUser(user) }));
+  if (!user) throw new ApiError(404, "User not found");
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { user: sanitizeUser(user) }));
 });
 
 /**
@@ -110,16 +117,23 @@ const updateProfile = asyncHandler(async (req, res) => {
   const updates = {};
   if (displayName !== undefined) updates.displayName = displayName.trim();
   if (bio !== undefined) {
-    if (bio.length > 1000) throw new ApiError(400, 'Bio must be 1000 characters or fewer');
+    if (bio.length > 1000)
+      throw new ApiError(400, "Bio must be 1000 characters or fewer");
     updates.bio = bio.trim();
   }
 
   if (Object.keys(updates).length === 0) {
-    throw new ApiError(400, 'No updatable fields provided');
+    throw new ApiError(400, "No updatable fields provided");
   }
 
-  const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
-  return res.status(200).json(new ApiResponse(200, { user: sanitizeUser(user) }, 'Profile updated'));
+  const user = await User.findByIdAndUpdate(req.user._id, updates, {
+    new: true,
+  });
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { user: sanitizeUser(user) }, "Profile updated"),
+    );
 });
 
 /**
@@ -131,20 +145,22 @@ const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
   if (!currentPassword || !newPassword) {
-    throw new ApiError(400, 'currentPassword and newPassword are required');
+    throw new ApiError(400, "currentPassword and newPassword are required");
   }
   if (newPassword.length < 8) {
-    throw new ApiError(400, 'New password must be at least 8 characters');
+    throw new ApiError(400, "New password must be at least 8 characters");
   }
 
-  const user = await User.findById(req.user._id).select('+passwordHash');
+  const user = await User.findById(req.user._id).select("+passwordHash");
   const isMatch = await user.isPasswordCorrect(currentPassword);
-  if (!isMatch) throw new ApiError(401, 'Current password is incorrect');
+  if (!isMatch) throw new ApiError(401, "Current password is incorrect");
 
   user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST);
   await user.save();
 
-  return res.status(200).json(new ApiResponse(200, null, 'Password changed successfully'));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Password changed successfully"));
 });
 
 /**
@@ -152,7 +168,7 @@ const changePassword = asyncHandler(async (req, res) => {
  * Upload or replace avatar. Requires: verifyJWT, uploadAvatar.single('avatar')
  */
 const updateAvatar = asyncHandler(async (req, res) => {
-  if (!req.file) throw new ApiError(400, 'Avatar image is required');
+  if (!req.file) throw new ApiError(400, "Avatar image is required");
 
   const user = await User.findById(req.user._id);
 
@@ -161,16 +177,22 @@ const updateAvatar = asyncHandler(async (req, res) => {
 
   // Delete old avatar from Cloudinary if it exists
   if (user.avatarPublicId) {
-    await deleteAsset(user.avatarPublicId, 'image');
+    await deleteAsset(user.avatarPublicId, "image");
   }
 
   user.avatar = url;
   user.avatarPublicId = publicId;
   await user.save();
 
-  return res.status(200).json(
-    new ApiResponse(200, { avatar: user.avatar }, 'Avatar updated successfully')
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { avatar: user.avatar },
+        "Avatar updated successfully",
+      ),
+    );
 });
 
 /**
@@ -178,7 +200,7 @@ const updateAvatar = asyncHandler(async (req, res) => {
  * Upload or replace channel banner. Requires: verifyJWT, uploadBanner.single('banner')
  */
 const updateBanner = asyncHandler(async (req, res) => {
-  if (!req.file) throw new ApiError(400, 'Banner image is required');
+  if (!req.file) throw new ApiError(400, "Banner image is required");
 
   const user = await User.findById(req.user._id);
 
@@ -187,16 +209,22 @@ const updateBanner = asyncHandler(async (req, res) => {
 
   // Delete old banner from Cloudinary if it exists
   if (user.bannerPublicId) {
-    await deleteAsset(user.bannerPublicId, 'image');
+    await deleteAsset(user.bannerPublicId, "image");
   }
 
   user.banner = url;
   user.bannerPublicId = publicId;
   await user.save();
 
-  return res.status(200).json(
-    new ApiResponse(200, { banner: user.banner }, 'Banner updated successfully')
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { banner: user.banner },
+        "Banner updated successfully",
+      ),
+    );
 });
 
 /**
@@ -207,14 +235,14 @@ const removeAvatar = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
 
   if (user.avatarPublicId) {
-    await deleteAsset(user.avatarPublicId, 'image');
+    await deleteAsset(user.avatarPublicId, "image");
   }
 
-  user.avatar = '';
-  user.avatarPublicId = '';
+  user.avatar = "";
+  user.avatarPublicId = "";
   await user.save();
 
-  return res.status(200).json(new ApiResponse(200, null, 'Avatar removed'));
+  return res.status(200).json(new ApiResponse(200, null, "Avatar removed"));
 });
 
 /**
@@ -225,14 +253,14 @@ const removeBanner = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
 
   if (user.bannerPublicId) {
-    await deleteAsset(user.bannerPublicId, 'image');
+    await deleteAsset(user.bannerPublicId, "image");
   }
 
-  user.banner = '';
-  user.bannerPublicId = '';
+  user.banner = "";
+  user.bannerPublicId = "";
   await user.save();
 
-  return res.status(200).json(new ApiResponse(200, null, 'Banner removed'));
+  return res.status(200).json(new ApiResponse(200, null, "Banner removed"));
 });
 
 /**
@@ -242,26 +270,30 @@ const removeBanner = asyncHandler(async (req, res) => {
  */
 const deleteAccount = asyncHandler(async (req, res) => {
   const { password } = req.body;
-  if (!password) throw new ApiError(400, 'Password is required to delete your account');
+  if (!password)
+    throw new ApiError(400, "Password is required to delete your account");
 
-  const user = await User.findById(req.user._id).select('+passwordHash');
-  if (!user) throw new ApiError(404, 'User not found');
+  const user = await User.findById(req.user._id).select("+passwordHash");
+  if (!user) throw new ApiError(404, "User not found");
 
   const isMatch = await user.isPasswordCorrect(password);
-  if (!isMatch) throw new ApiError(401, 'Incorrect password');
+  if (!isMatch) throw new ApiError(401, "Incorrect password");
 
-  const Video = require('../models/Video');
+  const Video = require("../models/Video");
 
   // Fetch all user videos for Cloudinary cleanup
   const videos = await Video.find({ owner: user._id }).lean();
 
   const assetDeletions = videos.flatMap((v) => {
-    const tasks = [deleteAsset(v.cloudinaryPublicId, 'video')];
-    if (v.thumbnailPublicId) tasks.push(deleteAsset(v.thumbnailPublicId, 'image'));
+    const tasks = [deleteAsset(v.cloudinaryPublicId, "video")];
+    if (v.thumbnailPublicId)
+      tasks.push(deleteAsset(v.thumbnailPublicId, "image"));
     return tasks;
   });
-  if (user.avatarPublicId) assetDeletions.push(deleteAsset(user.avatarPublicId, 'image'));
-  if (user.bannerPublicId) assetDeletions.push(deleteAsset(user.bannerPublicId, 'image'));
+  if (user.avatarPublicId)
+    assetDeletions.push(deleteAsset(user.avatarPublicId, "image"));
+  if (user.bannerPublicId)
+    assetDeletions.push(deleteAsset(user.bannerPublicId, "image"));
 
   await Promise.allSettled(assetDeletions);
 
@@ -272,10 +304,12 @@ const deleteAccount = asyncHandler(async (req, res) => {
   ]);
 
   // Clear refresh cookie
-  const { clearRefreshCookie } = require('../services/auth.service');
+  const { clearRefreshCookie } = require("../services/auth.service");
   clearRefreshCookie(res);
 
-  return res.status(200).json(new ApiResponse(200, null, 'Account deleted successfully'));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Account deleted successfully"));
 });
 
 module.exports = {

@@ -1,10 +1,10 @@
-import { useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { Flame, ChevronLeft, ChevronRight } from 'lucide-react';
-import { featuresService } from '../../services/features.service';
-import { formatCount, formatDuration } from '../../utils/format';
+import { useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import { Flame, ChevronLeft, ChevronRight } from "lucide-react";
+import { featuresService } from "../../services/features.service";
+import { formatCount, formatDuration } from "../../utils/format";
 
 const TrendingCard = ({ video, rank }) => (
   <Link
@@ -17,12 +17,15 @@ const TrendingCard = ({ video, rank }) => (
           src={video.thumbnailUrl}
           alt={video.title}
           loading="lazy"
+          decoding="async"
+          fetchPriority="low"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
       )}
       {/* Rank badge */}
-      <div className={`absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black
-        ${rank <= 3 ? 'bg-[#ff0000] text-white' : 'bg-black/70 text-white'}`}
+      <div
+        className={`absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black
+        ${rank <= 3 ? "bg-[#ff0000] text-white" : "bg-black/70 text-white"}`}
       >
         {rank}
       </div>
@@ -45,14 +48,16 @@ const TrendingRealtime = ({ hours = 2 }) => {
   const scrollRef = useRef(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['trending-realtime', hours],
-    queryFn: () => featuresService.getTrendingRealtime(hours).then((r) => r.data.data),
-    staleTime: 60_000,          // 60s — matches backend cache TTL
-    refetchInterval: 120_000,   // auto-refresh every 2 min
+    queryKey: ["trending-realtime", hours],
+    queryFn: () =>
+      featuresService.getTrendingRealtime(hours).then((r) => r.data.data),
+    staleTime: 60_000, // 60s — matches backend cache TTL
+    refetchInterval: 120_000, // auto-refresh every 2 min
   });
 
   const videos = data?.videos ?? [];
-  const scroll = (dir) => scrollRef.current?.scrollBy({ left: dir * 210, behavior: 'smooth' });
+  const scroll = (dir) =>
+    scrollRef.current?.scrollBy({ left: dir * 210, behavior: "smooth" });
 
   if (!isLoading && videos.length === 0) return null;
 
@@ -69,10 +74,16 @@ const TrendingRealtime = ({ hours = 2 }) => {
           )}
         </div>
         <div className="flex gap-1">
-          <button onClick={() => scroll(-1)} className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]">
+          <button
+            onClick={() => scroll(-1)}
+            className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]"
+          >
             <ChevronLeft size={16} />
           </button>
-          <button onClick={() => scroll(1)} className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]">
+          <button
+            onClick={() => scroll(1)}
+            className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]"
+          >
             <ChevronRight size={16} />
           </button>
         </div>
@@ -89,7 +100,10 @@ const TrendingRealtime = ({ hours = 2 }) => {
           ))}
         </div>
       ) : (
-        <div ref={scrollRef} className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
+        <div
+          ref={scrollRef}
+          className="flex gap-3 overflow-x-auto scrollbar-none pb-1"
+        >
           {videos.map((v, i) => (
             <motion.div
               key={v._id}

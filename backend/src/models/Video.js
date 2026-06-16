@@ -1,12 +1,12 @@
-'use strict';
+"use strict";
 
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const videoSchema = new mongoose.Schema(
   {
     owner: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: true,
       index: true,
     },
@@ -18,7 +18,7 @@ const videoSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      default: '',
+      default: "",
       maxlength: 5000,
     },
     videoUrl: {
@@ -31,11 +31,11 @@ const videoSchema = new mongoose.Schema(
     },
     thumbnailUrl: {
       type: String,
-      default: '',
+      default: "",
     },
     thumbnailPublicId: {
       type: String,
-      default: '',
+      default: "",
     },
     duration: {
       type: Number,
@@ -43,14 +43,14 @@ const videoSchema = new mongoose.Schema(
     },
     visibility: {
       type: String,
-      enum: ['public', 'unlisted', 'private'],
-      default: 'public',
+      enum: ["public", "unlisted", "private"],
+      default: "public",
       index: true,
     },
     status: {
       type: String,
-      enum: ['processing', 'published', 'failed'],
-      default: 'processing',
+      enum: ["processing", "published", "failed"],
+      default: "processing",
       index: true,
     },
     tags: {
@@ -58,7 +58,7 @@ const videoSchema = new mongoose.Schema(
       default: [],
       validate: {
         validator: (arr) => arr.length <= 15,
-        message: 'A video can have at most 15 tags',
+        message: "A video can have at most 15 tags",
       },
     },
     viewCount: {
@@ -88,7 +88,7 @@ const videoSchema = new mongoose.Schema(
     },
     deletedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       default: null,
     },
     deletedAt: {
@@ -99,11 +99,13 @@ const videoSchema = new mongoose.Schema(
     // ── Feature 2: Skip segments ──────────────────────────────────────────────
     // Each segment: { start, end, count } — count = how many users marked it
     skipSegments: {
-      type: [{
-        start:  { type: Number, required: true },
-        end:    { type: Number, required: true },
-        count:  { type: Number, default: 1 },
-      }],
+      type: [
+        {
+          start: { type: Number, required: true },
+          end: { type: Number, required: true },
+          count: { type: Number, default: 1 },
+        },
+      ],
       default: [],
     },
 
@@ -132,20 +134,31 @@ const videoSchema = new mongoose.Schema(
     // Users tagged as collaborators on this video (like Instagram/YouTube collab)
     collaborators: [
       {
-        user:      { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        status:    { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        status: {
+          type: String,
+          enum: ["pending", "accepted", "declined"],
+          default: "pending",
+        },
         invitedAt: { type: Date, default: Date.now },
       },
     ],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Compound indexes for feed and search queries
 videoSchema.index({ status: 1, visibility: 1, isDeleted: 1, createdAt: -1 });
 videoSchema.index({ owner: 1, isDeleted: 1, createdAt: -1 });
 videoSchema.index({ viewCount: -1, createdAt: -1 }); // trending
-videoSchema.index({ title: 'text', description: 'text', tags: 'text' }); // full-text search
-videoSchema.index({ 'collaborators.user': 1, 'collaborators.status': 1 }); // collab lookup
+videoSchema.index({
+  status: 1,
+  visibility: 1,
+  isDeleted: 1,
+  viewCount: -1,
+  createdAt: -1,
+}); // public trending feed
+videoSchema.index({ title: "text", description: "text", tags: "text" }); // full-text search
+videoSchema.index({ "collaborators.user": 1, "collaborators.status": 1 }); // collab lookup
 
-module.exports = mongoose.model('Video', videoSchema);
+module.exports = mongoose.model("Video", videoSchema);

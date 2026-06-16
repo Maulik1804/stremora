@@ -1,10 +1,10 @@
-import { useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
-import { featuresService } from '../../services/features.service';
-import { formatCount, formatDuration } from '../../utils/format';
+import { useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { featuresService } from "../../services/features.service";
+import { formatCount, formatDuration } from "../../utils/format";
 
 const VideoThumb = ({ video }) => (
   <Link
@@ -17,6 +17,8 @@ const VideoThumb = ({ video }) => (
           src={video.thumbnailUrl}
           alt={video.title}
           loading="lazy"
+          decoding="async"
+          fetchPriority="low"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
       )}
@@ -29,25 +31,35 @@ const VideoThumb = ({ video }) => (
     <p className="text-xs font-medium text-[#f8f8f8] line-clamp-2 leading-snug group-hover:text-white">
       {video.title}
     </p>
-    <p className="text-[11px] text-[#606060]">{formatCount(video.viewCount)} views</p>
+    <p className="text-[11px] text-[#606060]">
+      {formatCount(video.viewCount)} views
+    </p>
   </Link>
 );
 
 const PlaylistRow = ({ playlist }) => {
   const scrollRef = useRef(null);
   const scroll = (dir) => {
-    scrollRef.current?.scrollBy({ left: dir * 200, behavior: 'smooth' });
+    scrollRef.current?.scrollBy({ left: dir * 200, behavior: "smooth" });
   };
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[#f8f8f8]">{playlist.title}</h3>
+        <h3 className="text-sm font-semibold text-[#f8f8f8]">
+          {playlist.title}
+        </h3>
         <div className="flex gap-1">
-          <button onClick={() => scroll(-1)} className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]">
+          <button
+            onClick={() => scroll(-1)}
+            className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]"
+          >
             <ChevronLeft size={16} />
           </button>
-          <button onClick={() => scroll(1)} className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]">
+          <button
+            onClick={() => scroll(1)}
+            className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]"
+          >
             <ChevronRight size={16} />
           </button>
         </div>
@@ -56,7 +68,9 @@ const PlaylistRow = ({ playlist }) => {
         ref={scrollRef}
         className="flex gap-3 overflow-x-auto scrollbar-none pb-1"
       >
-        {playlist.videos.map((v) => <VideoThumb key={v._id} video={v} />)}
+        {playlist.videos.map((v) => (
+          <VideoThumb key={v._id} video={v} />
+        ))}
       </div>
     </div>
   );
@@ -64,7 +78,7 @@ const PlaylistRow = ({ playlist }) => {
 
 const SmartPlaylists = () => {
   const { data, isLoading } = useQuery({
-    queryKey: ['smart-playlists'],
+    queryKey: ["smart-playlists"],
     queryFn: () => featuresService.getSmartPlaylists().then((r) => r.data.data),
   });
 

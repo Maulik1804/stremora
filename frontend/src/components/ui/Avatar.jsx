@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 
 const GRADIENT_COLORS = [
   "from-red-500 to-orange-500",
@@ -42,6 +42,9 @@ const Avatar = ({ src, alt = "", size = "md", className = "", onClick }) => {
       <img
         src={src}
         alt={alt}
+        loading="lazy"
+        decoding="async"
+        fetchPriority="low"
         onError={() => setImgError(true)}
         onClick={onClick}
         className={`${base} object-cover object-center block ring-1 ring-white/10`}
@@ -60,4 +63,4 @@ const Avatar = ({ src, alt = "", size = "md", className = "", onClick }) => {
   );
 };
 
-export default Avatar;
+export default memo(Avatar);

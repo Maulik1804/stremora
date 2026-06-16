@@ -1,11 +1,11 @@
-import { useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, PlayCircle } from 'lucide-react';
-import { featuresService } from '../../services/features.service';
-import { useAuth } from '../../hooks/useAuth';
-import { formatDuration } from '../../utils/format';
+import { useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import { ChevronLeft, ChevronRight, PlayCircle } from "lucide-react";
+import { featuresService } from "../../services/features.service";
+import { useAuth } from "../../hooks/useAuth";
+import { formatDuration } from "../../utils/format";
 
 const ContinueCard = ({ entry }) => {
   const { video, progressSeconds, progressPercent } = entry;
@@ -21,13 +21,18 @@ const ContinueCard = ({ entry }) => {
             src={video.thumbnailUrl}
             alt={video.title}
             loading="lazy"
+            decoding="async"
+            fetchPriority="low"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         )}
 
         {/* Play overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-          <PlayCircle size={36} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+          <PlayCircle
+            size={36}
+            className="text-white opacity-0 group-hover:opacity-100 transition-opacity"
+          />
         </div>
 
         {/* Progress bar */}
@@ -48,7 +53,8 @@ const ContinueCard = ({ entry }) => {
         {video.title}
       </p>
       <p className="text-[11px] text-[#606060]">
-        {video.owner?.displayName || video.owner?.username} · {progressPercent}% watched
+        {video.owner?.displayName || video.owner?.username} · {progressPercent}%
+        watched
       </p>
     </Link>
   );
@@ -59,15 +65,17 @@ const ContinueWatching = () => {
   const scrollRef = useRef(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['continue-watching'],
-    queryFn: () => featuresService.getContinueWatching().then((r) => r.data.data),
+    queryKey: ["continue-watching"],
+    queryFn: () =>
+      featuresService.getContinueWatching().then((r) => r.data.data),
     enabled: isAuthenticated,
   });
 
   const videos = data?.videos ?? [];
   if (!isLoading && videos.length === 0) return null;
 
-  const scroll = (dir) => scrollRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
+  const scroll = (dir) =>
+    scrollRef.current?.scrollBy({ left: dir * 220, behavior: "smooth" });
 
   return (
     <section className="px-4 py-4 max-w-screen-2xl mx-auto">
@@ -77,10 +85,16 @@ const ContinueWatching = () => {
           Continue Watching
         </h2>
         <div className="flex gap-1">
-          <button onClick={() => scroll(-1)} className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]">
+          <button
+            onClick={() => scroll(-1)}
+            className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]"
+          >
             <ChevronLeft size={16} />
           </button>
-          <button onClick={() => scroll(1)} className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]">
+          <button
+            onClick={() => scroll(1)}
+            className="p-1 rounded-full hover:bg-white/8 text-[#a0a0a0]"
+          >
             <ChevronRight size={16} />
           </button>
         </div>
@@ -97,7 +111,10 @@ const ContinueWatching = () => {
           ))}
         </div>
       ) : (
-        <div ref={scrollRef} className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
+        <div
+          ref={scrollRef}
+          className="flex gap-3 overflow-x-auto scrollbar-none pb-1"
+        >
           {videos.map((entry, i) => (
             <motion.div
               key={entry._id}

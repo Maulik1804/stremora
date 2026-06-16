@@ -1,24 +1,32 @@
-'use strict';
+"use strict";
 
-const fs = require('fs');
-const Video = require('../models/Video');
-const asyncHandler = require('../utils/asyncHandler');
-const ApiError = require('../utils/ApiError');
-const ApiResponse = require('../utils/ApiResponse');
+const fs = require("fs");
+const Video = require("../models/Video");
+const asyncHandler = require("../utils/asyncHandler");
+const ApiError = require("../utils/ApiError");
+const ApiResponse = require("../utils/ApiResponse");
 const {
   uploadVideo: cloudinaryUploadVideo,
   uploadThumbnail: cloudinaryUploadThumbnail,
   deleteAsset,
-} = require('../services/cloudinary.service');
-const { PAGE_SIZE, cursorFilter, paginateResult } = require('../utils/pagination');
-const { createNotification } = require('./notification.controller');
-const Subscription = require('../models/Subscription');
+} = require("../services/cloudinary.service");
+const {
+  PAGE_SIZE,
+  cursorFilter,
+  paginateResult,
+} = require("../utils/pagination");
+const { createNotification } = require("./notification.controller");
+const Subscription = require("../models/Subscription");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const cleanTempFile = (path) => {
   if (path) {
-    try { fs.unlinkSync(path); } catch { /* ignore */ }
+    try {
+      fs.unlinkSync(path);
+    } catch {
+      /* ignore */
+    }
   }
 };
 
@@ -31,13 +39,13 @@ const cleanTempFile = (path) => {
  */
 const createVideo = asyncHandler(async (req, res) => {
   const videoFile = req.file;
-  if (!videoFile) throw new ApiError(400, 'Video file is required');
+  if (!videoFile) throw new ApiError(400, "Video file is required");
 
-  const { title, description = '', visibility = 'public', tags } = req.body;
+  const { title, description = "", visibility = "public", tags } = req.body;
 
   if (!title || !title.trim()) {
     cleanTempFile(videoFile.path);
-    throw new ApiError(400, 'Title is required');
+    throw new ApiError(400, "Title is required");
   }
 
   let videoData;
@@ -49,7 +57,9 @@ const createVideo = asyncHandler(async (req, res) => {
   }
 
   const parsedTags = tags
-    ? (Array.isArray(tags) ? tags : tags.split(',').map((t) => t.trim())).filter(Boolean).slice(0, 15)
+    ? (Array.isArray(tags) ? tags : tags.split(",").map((t) => t.trim()))
+        .filter(Boolean)
+        .slice(0, 15)
     : [];
 
   const video = await Video.create({
@@ -62,38 +72,45 @@ const createVideo = asyncHandler(async (req, res) => {
     cloudinaryPublicId: videoData.publicId,
     thumbnailUrl: videoData.thumbnailUrl,
     duration: videoData.duration,
-    status: 'published',
+    status: "published",
   });
 
   // Notify all subscribers about the new video (non-blocking)
-  if (visibility === 'public') {
+  if (visibility === "public") {
     setImmediate(async () => {
       try {
         const subs = await Subscription.find({
           channel: req.user._id,
-          notificationPreference: { $ne: 'none' },
-        }).select('subscriber').lean();
+          notificationPreference: { $ne: "none" },
+        })
+          .select("subscriber")
+          .lean();
 
         const uploaderName = req.user.displayName || req.user.username;
         await Promise.all(
           subs.map((s) =>
             createNotification({
               recipient: s.subscriber,
-              type: 'new_video',
+              type: "new_video",
               actor: req.user._id,
               resourceId: video._id,
-              resourceType: 'video',
+              resourceType: "video",
               message: `${uploaderName} uploaded a new video: "${video.title}"`,
-            })
-          )
+            }),
+          ),
         );
       } catch (err) {
-        console.error('[Notification] Failed to notify subscribers:', err.message);
+        console.error(
+          "[Notification] Failed to notify subscribers:",
+          err.message,
+        );
       }
     });
   }
 
-  return res.status(201).json(new ApiResponse(201, { video }, 'Video uploaded successfully'));
+  return res
+    .status(201)
+    .json(new ApiResponse(201, { video }, "Video uploaded successfully"));
 });
 
 /**
@@ -102,11 +119,11 @@ const createVideo = asyncHandler(async (req, res) => {
  */
 const uploadThumbnail = asyncHandler(async (req, res) => {
   const imageFile = req.file;
-  if (!imageFile) throw new ApiError(400, 'Thumbnail image is required');
+  if (!imageFile) throw new ApiError(400, "Thumbnail image is required");
 
   const video = await Video.findOne({ _id: req.params.id, isDeleted: false });
-  if (!video) throw new ApiError(404, 'Video not found');
-  if (!video.owner.equals(req.user._id)) throw new ApiError(403, 'Forbidden');
+  if (!video) throw new ApiError(404, "Video not found");
+  if (!video.owner.equals(req.user._id)) throw new ApiError(403, "Forbidden");
 
   let imageData;
   try {
@@ -118,14 +135,22 @@ const uploadThumbnail = asyncHandler(async (req, res) => {
 
   // Delete old custom thumbnail if it exists
   if (video.thumbnailPublicId) {
-    await deleteAsset(video.thumbnailPublicId, 'image');
+    await deleteAsset(video.thumbnailPublicId, "image");
   }
 
   video.thumbnailUrl = imageData.url;
   video.thumbnailPublicId = imageData.publicId;
   await video.save();
 
-  return res.status(200).json(new ApiResponse(200, { thumbnailUrl: video.thumbnailUrl }, 'Thumbnail updated'));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { thumbnailUrl: video.thumbnailUrl },
+        "Thumbnail updated",
+      ),
+    );
 });
 
 /**
@@ -133,26 +158,30 @@ const uploadThumbnail = asyncHandler(async (req, res) => {
  * Get a single video by ID.
  */
 const getVideoById = asyncHandler(async (req, res) => {
-  const Subscription = require('../models/Subscription');
+  const Subscription = require("../models/Subscription");
 
   const video = await Video.findOne({
     _id: req.params.id,
     isDeleted: false,
-    status: 'published',
-  }).populate('owner', 'username displayName avatar')
-    .populate('collaborators.user', 'username displayName avatar');
+    status: "published",
+  })
+    .populate("owner", "username displayName avatar")
+    .populate("collaborators.user", "username displayName avatar")
+    .lean();
 
-  if (!video) throw new ApiError(404, 'Video not found');
+  if (!video) throw new ApiError(404, "Video not found");
 
   // Private videos only visible to owner
-  if (video.visibility === 'private') {
+  if (video.visibility === "private") {
     if (!req.user?._id || !video.owner._id.equals(req.user._id)) {
-      throw new ApiError(403, 'Forbidden');
+      throw new ApiError(403, "Forbidden");
     }
   }
 
   // Attach live subscriber count to owner
-  const subscriberCount = await Subscription.countDocuments({ channel: video.owner._id });
+  const subscriberCount = await Subscription.countDocuments({
+    channel: video.owner._id,
+  });
 
   // Check if requesting user is subscribed
   let isSubscribed = false;
@@ -164,8 +193,10 @@ const getVideoById = asyncHandler(async (req, res) => {
     isSubscribed = !!sub;
   }
 
-  const videoObj = video.toObject();
-  videoObj.owner = { ...videoObj.owner, subscriberCount, isSubscribed };
+  const videoObj = {
+    ...video,
+    owner: { ...video.owner, subscriberCount, isSubscribed },
+  };
 
   return res.status(200).json(new ApiResponse(200, { video: videoObj }));
 });
@@ -183,33 +214,55 @@ const getAllVideos = asyncHandler(async (req, res) => {
   // First page — return a random sample for YouTube-like discovery
   if (!cursor) {
     const baseFilter = {
-      status: 'published',
-      visibility: 'public',
+      status: "published",
+      visibility: "public",
       isDeleted: false,
     };
 
-    const docs = await Video.aggregate([
-      { $match: baseFilter },
-      { $sample: { size: limit } },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'owner',
-          foreignField: '_id',
-          as: 'owner',
-          pipeline: [{ $project: { username: 1, displayName: 1, avatar: 1 } }],
-        },
-      },
-      { $unwind: '$owner' },
-    ]);
+    const seedValue = Number.parseFloat(req.query.seed);
+    const seed =
+      Number.isFinite(seedValue) && seedValue >= 0 && seedValue < 1
+        ? seedValue
+        : Math.random();
+    const selectFields =
+      "title thumbnailUrl duration viewCount createdAt owner randomSortKey";
 
-    return res.status(200).json(new ApiResponse(200, { videos: docs, nextCursor: null, hasMore: false }));
+    let docs = await Video.find({
+      ...baseFilter,
+      randomSortKey: { $gte: seed },
+    })
+      .sort({ randomSortKey: 1, createdAt: -1 })
+      .limit(limit + 1)
+      .select(selectFields)
+      .populate("owner", "username displayName avatar")
+      .lean();
+
+    if (docs.length < limit + 1) {
+      const remaining = limit + 1 - docs.length;
+      const wrapDocs = await Video.find({
+        ...baseFilter,
+        randomSortKey: { $lt: seed },
+      })
+        .sort({ randomSortKey: 1, createdAt: -1 })
+        .limit(remaining)
+        .select(selectFields)
+        .populate("owner", "username displayName avatar")
+        .lean();
+
+      docs = docs.concat(wrapDocs);
+    }
+
+    const { items, nextCursor, hasMore } = paginateResult(docs, limit);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { videos: items, nextCursor, hasMore }));
   }
 
   // Subsequent pages — cursor-based pagination (newest first)
   const filter = {
-    status: 'published',
-    visibility: 'public',
+    status: "published",
+    visibility: "public",
     isDeleted: false,
     ...cursorFilter(cursor),
   };
@@ -217,12 +270,15 @@ const getAllVideos = asyncHandler(async (req, res) => {
   const docs = await Video.find(filter)
     .sort({ createdAt: -1 })
     .limit(limit + 1)
-    .populate('owner', 'username displayName avatar')
+    .select("title thumbnailUrl duration viewCount createdAt owner")
+    .populate("owner", "username displayName avatar")
     .lean();
 
   const { items, nextCursor, hasMore } = paginateResult(docs, limit);
 
-  return res.status(200).json(new ApiResponse(200, { videos: items, nextCursor, hasMore }));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { videos: items, nextCursor, hasMore }));
 });
 
 /**
@@ -234,14 +290,14 @@ const getTrendingVideos = asyncHandler(async (req, res) => {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const videos = await Video.find({
-    status: 'published',
-    visibility: 'public',
+    status: "published",
+    visibility: "public",
     isDeleted: false,
     createdAt: { $gte: since },
   })
     .sort({ viewCount: -1, createdAt: -1 })
     .limit(limit)
-    .populate('owner', 'username displayName avatar')
+    .populate("owner", "username displayName avatar")
     .lean();
 
   return res.status(200).json(new ApiResponse(200, { videos }));
@@ -253,18 +309,18 @@ const getTrendingVideos = asyncHandler(async (req, res) => {
  * Query: q, cursor, sort (relevance|date|views), duration (short|medium|long), date (today|week|month|year)
  */
 const searchVideos = asyncHandler(async (req, res) => {
-  const { q, cursor, sort = 'relevance', duration, date } = req.query;
+  const { q, cursor, sort = "relevance", duration, date } = req.query;
 
   if (!q || q.trim().length < 2) {
-    throw new ApiError(400, 'Search query must be at least 2 characters');
+    throw new ApiError(400, "Search query must be at least 2 characters");
   }
 
   const limit = Math.min(parseInt(req.query.limit) || PAGE_SIZE, 50);
 
   const filter = {
     $text: { $search: q.trim() },
-    status: 'published',
-    visibility: 'public',
+    status: "published",
+    visibility: "public",
     isDeleted: false,
   };
 
@@ -283,9 +339,9 @@ const searchVideos = asyncHandler(async (req, res) => {
   // Duration filter (seconds)
   if (duration) {
     const durationMap = {
-      short: { $lt: 240 },        // < 4 min
+      short: { $lt: 240 }, // < 4 min
       medium: { $gte: 240, $lt: 1200 }, // 4–20 min
-      long: { $gte: 1200 },       // > 20 min
+      long: { $gte: 1200 }, // > 20 min
     };
     if (durationMap[duration]) filter.duration = durationMap[duration];
   }
@@ -297,17 +353,19 @@ const searchVideos = asyncHandler(async (req, res) => {
   }
 
   const sortMap = {
-    relevance: { score: { $meta: 'textScore' }, createdAt: -1 },
+    relevance: { score: { $meta: "textScore" }, createdAt: -1 },
     date: { createdAt: -1 },
     views: { viewCount: -1 },
   };
 
-  const projection = sort === 'relevance' ? { score: { $meta: 'textScore' } } : {};
+  const projection =
+    sort === "relevance" ? { score: { $meta: "textScore" } } : {};
 
   const docs = await Video.find(filter, projection)
     .sort(sortMap[sort] || sortMap.relevance)
     .limit(limit + 1)
-    .populate('owner', 'username displayName avatar')
+    .select("title thumbnailUrl duration viewCount createdAt owner tags")
+    .populate("owner", "username displayName avatar")
     .lean();
 
   const { items, nextCursor, hasMore } = paginateResult(docs, limit);
@@ -318,8 +376,8 @@ const searchVideos = asyncHandler(async (req, res) => {
       nextCursor,
       hasMore,
       total: items.length,
-      message: items.length === 0 ? 'No results found' : undefined,
-    })
+      message: items.length === 0 ? "No results found" : undefined,
+    }),
   );
 });
 
@@ -329,8 +387,8 @@ const searchVideos = asyncHandler(async (req, res) => {
  */
 const updateVideo = asyncHandler(async (req, res) => {
   const video = await Video.findOne({ _id: req.params.id, isDeleted: false });
-  if (!video) throw new ApiError(404, 'Video not found');
-  if (!video.owner.equals(req.user._id)) throw new ApiError(403, 'Forbidden');
+  if (!video) throw new ApiError(404, "Video not found");
+  if (!video.owner.equals(req.user._id)) throw new ApiError(403, "Forbidden");
 
   const { title, description, visibility, tags } = req.body;
 
@@ -338,13 +396,15 @@ const updateVideo = asyncHandler(async (req, res) => {
   if (description !== undefined) video.description = description;
   if (visibility !== undefined) video.visibility = visibility;
   if (tags !== undefined) {
-    const parsed = Array.isArray(tags) ? tags : tags.split(',').map((t) => t.trim());
+    const parsed = Array.isArray(tags)
+      ? tags
+      : tags.split(",").map((t) => t.trim());
     video.tags = parsed.slice(0, 15);
   }
 
   await video.save();
 
-  return res.status(200).json(new ApiResponse(200, { video }, 'Video updated'));
+  return res.status(200).json(new ApiResponse(200, { video }, "Video updated"));
 });
 
 /**
@@ -353,19 +413,19 @@ const updateVideo = asyncHandler(async (req, res) => {
  */
 const deleteVideo = asyncHandler(async (req, res) => {
   const video = await Video.findOne({ _id: req.params.id, isDeleted: false });
-  if (!video) throw new ApiError(404, 'Video not found');
-  if (!video.owner.equals(req.user._id)) throw new ApiError(403, 'Forbidden');
+  if (!video) throw new ApiError(404, "Video not found");
+  if (!video.owner.equals(req.user._id)) throw new ApiError(403, "Forbidden");
 
   video.isDeleted = true;
   await video.save();
 
   // Delete Cloudinary assets (non-blocking)
-  deleteAsset(video.cloudinaryPublicId, 'video').catch(() => {});
+  deleteAsset(video.cloudinaryPublicId, "video").catch(() => {});
   if (video.thumbnailPublicId) {
-    deleteAsset(video.thumbnailPublicId, 'image').catch(() => {});
+    deleteAsset(video.thumbnailPublicId, "image").catch(() => {});
   }
 
-  return res.status(200).json(new ApiResponse(200, null, 'Video deleted'));
+  return res.status(200).json(new ApiResponse(200, null, "Video deleted"));
 });
 
 /**
@@ -399,38 +459,60 @@ const getChannelVideos = asyncHandler(async (req, res) => {
   // Include videos owned by this user OR where they are an accepted collaborator
   const filter = {
     $or: [
-      { owner: req.params.userId, status: 'published', visibility: 'public', isDeleted: false, ...cursorFilter(cursor) },
-      { 'collaborators': { $elemMatch: { user: req.params.userId, status: 'accepted' } }, status: 'published', visibility: 'public', isDeleted: false, ...cursorFilter(cursor) },
+      {
+        owner: req.params.userId,
+        status: "published",
+        visibility: "public",
+        isDeleted: false,
+        ...cursorFilter(cursor),
+      },
+      {
+        collaborators: {
+          $elemMatch: { user: req.params.userId, status: "accepted" },
+        },
+        status: "published",
+        visibility: "public",
+        isDeleted: false,
+        ...cursorFilter(cursor),
+      },
     ],
   };
 
   const docs = await Video.find(filter)
     .sort({ createdAt: -1 })
     .limit(limit + 1)
-    .populate('owner', 'username displayName avatar')
-    .populate('collaborators.user', 'username displayName avatar')
+    .populate("owner", "username displayName avatar")
+    .populate("collaborators.user", "username displayName avatar")
     .lean();
 
   const { items, nextCursor, hasMore } = paginateResult(docs, limit);
 
-  return res.status(200).json(new ApiResponse(200, { videos: items, nextCursor, hasMore }));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { videos: items, nextCursor, hasMore }));
 });
 const getSubscriptionFeed = asyncHandler(async (req, res) => {
-  const Subscription = require('../models/Subscription');
+  const Subscription = require("../models/Subscription");
   const limit = Math.min(parseInt(req.query.limit) || PAGE_SIZE, 50);
   const cursor = req.query.cursor;
 
-  const subs = await Subscription.find({ subscriber: req.user._id }).select('channel').lean();
+  const subs = await Subscription.find({ subscriber: req.user._id })
+    .select("channel")
+    .lean();
   const channelIds = subs.map((s) => s.channel);
 
   if (channelIds.length === 0) {
-    return res.status(200).json(new ApiResponse(200, { videos: [], nextCursor: null, hasMore: false }));
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, { videos: [], nextCursor: null, hasMore: false }),
+      );
   }
 
   const filter = {
     owner: { $in: channelIds },
-    status: 'published',
-    visibility: 'public',
+    status: "published",
+    visibility: "public",
     isDeleted: false,
     ...cursorFilter(cursor),
   };
@@ -438,12 +520,14 @@ const getSubscriptionFeed = asyncHandler(async (req, res) => {
   const docs = await Video.find(filter)
     .sort({ createdAt: -1 })
     .limit(limit + 1)
-    .populate('owner', 'username displayName avatar')
+    .populate("owner", "username displayName avatar")
     .lean();
 
   const { items, nextCursor, hasMore } = paginateResult(docs, limit);
 
-  return res.status(200).json(new ApiResponse(200, { videos: items, nextCursor, hasMore }));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { videos: items, nextCursor, hasMore }));
 });
 
 /**
@@ -454,12 +538,12 @@ const initChunkedUpload = asyncHandler(async (req, res) => {
   const { fileName, fileSize, title, description, visibility, tags } = req.body;
 
   if (!title || !title.trim()) {
-    throw new ApiError(400, 'Title is required');
+    throw new ApiError(400, "Title is required");
   }
 
   // Store upload session in memory (in production, use Redis or database)
   const uploadSessionId = `${req.user._id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
+
   // Store metadata for later use
   global.uploadSessions = global.uploadSessions || {};
   global.uploadSessions[uploadSessionId] = {
@@ -467,14 +551,22 @@ const initChunkedUpload = asyncHandler(async (req, res) => {
     fileName,
     fileSize,
     title: title.trim(),
-    description: description || '',
-    visibility: visibility || 'public',
-    tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(t => t.trim())).filter(Boolean).slice(0, 15) : [],
+    description: description || "",
+    visibility: visibility || "public",
+    tags: tags
+      ? (Array.isArray(tags) ? tags : tags.split(",").map((t) => t.trim()))
+          .filter(Boolean)
+          .slice(0, 15)
+      : [],
     chunks: {},
     createdAt: Date.now(),
   };
 
-  return res.status(200).json(new ApiResponse(200, { uploadSessionId }, 'Upload session initialized'));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { uploadSessionId }, "Upload session initialized"),
+    );
 });
 
 /**
@@ -484,27 +576,30 @@ const initChunkedUpload = asyncHandler(async (req, res) => {
 const uploadChunk = asyncHandler(async (req, res) => {
   const { uploadSessionId } = req.params;
   const chunkFile = req.file;
-  
-  if (!chunkFile) throw new ApiError(400, 'Chunk file is required');
+
+  if (!chunkFile) throw new ApiError(400, "Chunk file is required");
 
   global.uploadSessions = global.uploadSessions || {};
   const session = global.uploadSessions[uploadSessionId];
-  
-  if (!session) throw new ApiError(404, 'Upload session not found');
-  if (!session.userId.equals(req.user._id)) throw new ApiError(403, 'Forbidden');
+
+  if (!session) throw new ApiError(404, "Upload session not found");
+  if (!session.userId.equals(req.user._id))
+    throw new ApiError(403, "Forbidden");
 
   const { chunkIndex, totalChunks } = req.body;
-  
+
   if (chunkIndex === undefined || totalChunks === undefined) {
     cleanTempFile(chunkFile.path);
-    throw new ApiError(400, 'chunkIndex and totalChunks are required');
+    throw new ApiError(400, "chunkIndex and totalChunks are required");
   }
 
   // Store chunk path
   session.chunks[chunkIndex] = chunkFile.path;
   session.totalChunks = totalChunks;
 
-  return res.status(200).json(new ApiResponse(200, { chunkIndex }, 'Chunk uploaded'));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { chunkIndex }, "Chunk uploaded"));
 });
 
 /**
@@ -518,11 +613,12 @@ const finalizeChunkedUpload = asyncHandler(async (req, res) => {
   global.uploadSessions = global.uploadSessions || {};
   const session = global.uploadSessions[uploadSessionId];
 
-  if (!session) throw new ApiError(404, 'Upload session not found');
-  if (!session.userId.equals(req.user._id)) throw new ApiError(403, 'Forbidden');
+  if (!session) throw new ApiError(404, "Upload session not found");
+  if (!session.userId.equals(req.user._id))
+    throw new ApiError(403, "Forbidden");
 
-  const path = require('path');
-  const os = require('os');
+  const path = require("path");
+  const os = require("os");
 
   // Verify all chunks exist before starting
   for (let i = 0; i < session.totalChunks; i++) {
@@ -539,28 +635,35 @@ const finalizeChunkedUpload = asyncHandler(async (req, res) => {
     description: session.description,
     visibility: session.visibility,
     tags: session.tags,
-    videoUrl: '',
-    cloudinaryPublicId: '',
-    thumbnailUrl: '',
+    videoUrl: "",
+    cloudinaryPublicId: "",
+    thumbnailUrl: "",
     duration: 0,
-    status: 'processing',
+    status: "processing",
   });
 
   console.log(`[Upload] Video record created (processing): ${video._id}`);
 
   // Return immediately — frontend gets success right away
-  res.status(201).json(new ApiResponse(201, { video }, 'Video processing started'));
+  res
+    .status(201)
+    .json(new ApiResponse(201, { video }, "Video processing started"));
 
   // ── Background: combine + upload to Cloudinary ────────────────────────────
   setImmediate(async () => {
-    const combinedPath = path.join(os.tmpdir(), `combined_${uploadSessionId}.mp4`);
+    const combinedPath = path.join(
+      os.tmpdir(),
+      `combined_${uploadSessionId}.mp4`,
+    );
 
     try {
-      console.log(`[Upload] Background: combining ${session.totalChunks} chunks...`);
+      console.log(
+        `[Upload] Background: combining ${session.totalChunks} chunks...`,
+      );
 
       const writeStream = fs.createWriteStream(combinedPath, {
         highWaterMark: 1024 * 1024,
-        flags: 'w',
+        flags: "w",
         mode: 0o666,
       });
 
@@ -571,9 +674,11 @@ const finalizeChunkedUpload = asyncHandler(async (req, res) => {
         }
 
         await new Promise((resolve, reject) => {
-          const readStream = fs.createReadStream(chunkPath, { highWaterMark: 1024 * 1024 });
-          readStream.on('error', reject);
-          readStream.on('end', resolve);
+          const readStream = fs.createReadStream(chunkPath, {
+            highWaterMark: 1024 * 1024,
+          });
+          readStream.on("error", reject);
+          readStream.on("end", resolve);
           readStream.pipe(writeStream, { end: false });
         });
 
@@ -583,17 +688,21 @@ const finalizeChunkedUpload = asyncHandler(async (req, res) => {
 
       await new Promise((resolve, reject) => {
         writeStream.end(resolve);
-        writeStream.on('error', reject);
+        writeStream.on("error", reject);
       });
 
       const stats = fs.statSync(combinedPath);
-      if (stats.size === 0) throw new Error('Combined file is empty');
+      if (stats.size === 0) throw new Error("Combined file is empty");
 
-      console.log(`[Upload] Background: combined file ${(stats.size / 1024 / 1024).toFixed(2)} MB, uploading to Cloudinary...`);
+      console.log(
+        `[Upload] Background: combined file ${(stats.size / 1024 / 1024).toFixed(2)} MB, uploading to Cloudinary...`,
+      );
 
       const videoData = await cloudinaryUploadVideo(combinedPath);
 
-      console.log(`[Upload] Background: Cloudinary upload done — ${videoData.publicId}`);
+      console.log(
+        `[Upload] Background: Cloudinary upload done — ${videoData.publicId}`,
+      );
 
       // Update video record to published
       await Video.findByIdAndUpdate(video._id, {
@@ -601,45 +710,56 @@ const finalizeChunkedUpload = asyncHandler(async (req, res) => {
         cloudinaryPublicId: videoData.publicId,
         thumbnailUrl: videoData.thumbnailUrl,
         duration: videoData.duration,
-        status: 'published',
+        status: "published",
       });
 
       console.log(`[Upload] Background: video ${video._id} published`);
 
       // Notify subscribers
-      if (session.visibility === 'public') {
+      if (session.visibility === "public") {
         try {
           const subs = await Subscription.find({
             channel: session.userId,
-            notificationPreference: { $ne: 'none' },
-          }).select('subscriber').lean();
-
-          const uploader = await require('../models/User')
-            .findById(session.userId)
-            .select('displayName username')
+            notificationPreference: { $ne: "none" },
+          })
+            .select("subscriber")
             .lean();
-          const uploaderName = uploader?.displayName || uploader?.username || 'Someone';
+
+          const uploader = await require("../models/User")
+            .findById(session.userId)
+            .select("displayName username")
+            .lean();
+          const uploaderName =
+            uploader?.displayName || uploader?.username || "Someone";
 
           await Promise.all(
             subs.map((s) =>
               createNotification({
                 recipient: s.subscriber,
-                type: 'new_video',
+                type: "new_video",
                 actor: session.userId,
                 resourceId: video._id,
-                resourceType: 'video',
+                resourceType: "video",
                 message: `${uploaderName} uploaded a new video: "${video.title}"`,
-              })
-            )
+              }),
+            ),
           );
         } catch (notifErr) {
-          console.error('[Notification] Failed to notify subscribers:', notifErr.message);
+          console.error(
+            "[Notification] Failed to notify subscribers:",
+            notifErr.message,
+          );
         }
       }
     } catch (bgErr) {
-      console.error(`[Upload] Background processing failed for video ${video._id}:`, bgErr.message);
+      console.error(
+        `[Upload] Background processing failed for video ${video._id}:`,
+        bgErr.message,
+      );
       // Mark video as failed so it doesn't show as processing forever
-      await Video.findByIdAndUpdate(video._id, { status: 'failed' }).catch(() => {});
+      await Video.findByIdAndUpdate(video._id, { status: "failed" }).catch(
+        () => {},
+      );
       cleanTempFile(combinedPath);
     } finally {
       delete global.uploadSessions[uploadSessionId];
@@ -661,42 +781,54 @@ const getUploadStatus = asyncHandler(async (req, res) => {
 
   if (session) {
     // Session still active — finalize hasn't been called yet or is in progress
-    return res.status(200).json(new ApiResponse(200, { video: null, status: 'pending' }));
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { video: null, status: "pending" }));
   }
 
   // Session gone — look for the video by matching the session pattern in owner + recent creation
   // We use the userId embedded in the sessionId: "userId_timestamp_random"
-  const parts = uploadSessionId.split('_');
+  const parts = uploadSessionId.split("_");
   if (parts.length < 2) {
-    return res.status(200).json(new ApiResponse(200, { video: null, status: 'pending' }));
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { video: null, status: "pending" }));
   }
 
   const userId = parts[0];
   const sessionTimestamp = parseInt(parts[1]);
 
   if (!sessionTimestamp) {
-    return res.status(200).json(new ApiResponse(200, { video: null, status: 'pending' }));
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { video: null, status: "pending" }));
   }
 
   // Find the most recent video created by this user around the session time (±5 min)
   const video = await Video.findOne({
     owner: userId,
     createdAt: {
-      $gte: new Date(sessionTimestamp - 60000),   // 1 min before session
-      $lte: new Date(sessionTimestamp + 600000),  // 10 min after session
+      $gte: new Date(sessionTimestamp - 60000), // 1 min before session
+      $lte: new Date(sessionTimestamp + 600000), // 10 min after session
     },
     isDeleted: false,
-  }).sort({ createdAt: -1 }).lean();
+  })
+    .sort({ createdAt: -1 })
+    .lean();
 
   if (!video) {
-    return res.status(200).json(new ApiResponse(200, { video: null, status: 'pending' }));
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { video: null, status: "pending" }));
   }
 
-  return res.status(200).json(new ApiResponse(200, { video, status: video.status }));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { video, status: video.status }));
 });
 const recordView = asyncHandler(async (req, res) => {
   await Video.findByIdAndUpdate(req.params.id, { $inc: { viewCount: 1 } });
-  return res.status(200).json(new ApiResponse(200, null, 'View recorded'));
+  return res.status(200).json(new ApiResponse(200, null, "View recorded"));
 });
 
 /**
@@ -705,34 +837,40 @@ const recordView = asyncHandler(async (req, res) => {
  * Requires: verifyJWT
  */
 const getUploadSignature = asyncHandler(async (req, res) => {
-  const cloudinaryInstance = require('../config/cloudinary');
-  const { CLOUDINARY_API_KEY, CLOUDINARY_CLOUD_NAME } = require('../config/env');
+  const cloudinaryInstance = require("../config/cloudinary");
+  const {
+    CLOUDINARY_API_KEY,
+    CLOUDINARY_CLOUD_NAME,
+  } = require("../config/env");
 
-  const resourceType = req.query.resourceType || 'video';
+  const resourceType = req.query.resourceType || "video";
   const timestamp = Math.round(Date.now() / 1000);
-  const folder = resourceType === 'image' ? 'streamora/thumbnails' : 'streamora/videos';
+  const folder =
+    resourceType === "image" ? "streamora/thumbnails" : "streamora/videos";
 
   // Build params to sign
   const paramsToSign = { timestamp, folder };
 
   // For images (thumbnails), include transformation in signature
-  if (resourceType === 'image') {
-    paramsToSign.transformation = 'w_1280,h_720,c_fill,q_auto,f_auto';
+  if (resourceType === "image") {
+    paramsToSign.transformation = "w_1280,h_720,c_fill,q_auto,f_auto";
   }
 
   const signature = cloudinaryInstance.utils.api_sign_request(
     paramsToSign,
-    process.env.CLOUDINARY_API_SECRET
+    process.env.CLOUDINARY_API_SECRET,
   );
 
-  return res.status(200).json(new ApiResponse(200, {
-    signature,
-    timestamp,
-    folder,
-    transformation: paramsToSign.transformation,
-    apiKey: CLOUDINARY_API_KEY,
-    cloudName: CLOUDINARY_CLOUD_NAME,
-  }));
+  return res.status(200).json(
+    new ApiResponse(200, {
+      signature,
+      timestamp,
+      folder,
+      transformation: paramsToSign.transformation,
+      apiKey: CLOUDINARY_API_KEY,
+      cloudName: CLOUDINARY_CLOUD_NAME,
+    }),
+  );
 });
 
 /**
@@ -743,15 +881,29 @@ const getUploadSignature = asyncHandler(async (req, res) => {
  */
 const saveVideo = asyncHandler(async (req, res) => {
   const {
-    title, description = '', visibility = 'public', tags,
-    cloudinaryPublicId, videoUrl, thumbnailUrl, duration,
+    title,
+    description = "",
+    visibility = "public",
+    tags,
+    cloudinaryPublicId,
+    videoUrl,
+    thumbnailUrl,
+    duration,
   } = req.body;
 
-  if (!title?.trim()) throw new ApiError(400, 'Title is required');
-  if (!cloudinaryPublicId || !videoUrl) throw new ApiError(400, 'Cloudinary upload data is required');
+  if (!title?.trim()) throw new ApiError(400, "Title is required");
+  if (!cloudinaryPublicId || !videoUrl)
+    throw new ApiError(400, "Cloudinary upload data is required");
 
   const parsedTags = tags
-    ? (Array.isArray(tags) ? tags : String(tags).split(',').map((t) => t.trim())).filter(Boolean).slice(0, 15)
+    ? (Array.isArray(tags)
+        ? tags
+        : String(tags)
+            .split(",")
+            .map((t) => t.trim())
+      )
+        .filter(Boolean)
+        .slice(0, 15)
     : [];
 
   const video = await Video.create({
@@ -762,35 +914,43 @@ const saveVideo = asyncHandler(async (req, res) => {
     tags: parsedTags,
     videoUrl,
     cloudinaryPublicId,
-    thumbnailUrl: thumbnailUrl || '',
+    thumbnailUrl: thumbnailUrl || "",
     duration: Math.round(duration || 0),
-    status: 'published',
+    status: "published",
   });
 
   // Notify subscribers (non-blocking)
-  if (visibility === 'public') {
+  if (visibility === "public") {
     setImmediate(async () => {
       try {
         const subs = await Subscription.find({
           channel: req.user._id,
-          notificationPreference: { $ne: 'none' },
-        }).select('subscriber').lean();
+          notificationPreference: { $ne: "none" },
+        })
+          .select("subscriber")
+          .lean();
         const uploaderName = req.user.displayName || req.user.username;
-        await Promise.all(subs.map((s) => createNotification({
-          recipient: s.subscriber,
-          type: 'new_video',
-          actor: req.user._id,
-          resourceId: video._id,
-          resourceType: 'video',
-          message: `${uploaderName} uploaded a new video: "${video.title}"`,
-        })));
+        await Promise.all(
+          subs.map((s) =>
+            createNotification({
+              recipient: s.subscriber,
+              type: "new_video",
+              actor: req.user._id,
+              resourceId: video._id,
+              resourceType: "video",
+              message: `${uploaderName} uploaded a new video: "${video.title}"`,
+            }),
+          ),
+        );
       } catch (err) {
-        console.error('[Notification] Failed:', err.message);
+        console.error("[Notification] Failed:", err.message);
       }
     });
   }
 
-  return res.status(201).json(new ApiResponse(201, { video }, 'Video saved successfully'));
+  return res
+    .status(201)
+    .json(new ApiResponse(201, { video }, "Video saved successfully"));
 });
 
 module.exports = {

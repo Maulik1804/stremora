@@ -1,17 +1,17 @@
-'use strict';
+"use strict";
 
-const express = require('express');
-const helmet = require('helmet');
-const cors = require('cors');
-const compression = require('compression');
-const cookieParser = require('cookie-parser');
-const mongoSanitize = require('express-mongo-sanitize');
+const express = require("express");
+const helmet = require("helmet");
+const cors = require("cors");
+const compression = require("compression");
+const cookieParser = require("cookie-parser");
+const mongoSanitize = require("express-mongo-sanitize");
 // xss sanitization applied via express-mongo-sanitize + helmet CSP
 
-const { CORS_ORIGIN } = require('./config/env');
-const { globalRateLimiter } = require('./middlewares/rateLimiter.middleware');
-const globalErrorHandler = require('./middlewares/error.middleware');
-const ApiError = require('./utils/ApiError');
+const { CORS_ORIGIN } = require("./config/env");
+const { globalRateLimiter } = require("./middlewares/rateLimiter.middleware");
+const globalErrorHandler = require("./middlewares/error.middleware");
+const ApiError = require("./utils/ApiError");
 
 const app = express();
 
@@ -28,23 +28,22 @@ app.use(
       // No origin = Vite proxy or curl/Postman — always allow
       if (!origin) return callback(null, true);
       // Allow any localhost port (covers any dev machine)
-      if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
-      // Allow any Cloudflare tunnel URL — so you never need to update backend when tunnel restarts
-      if (/^https:\/\/[^.]+\.trycloudflare\.com$/.test(origin)) return callback(null, true);
+      if (/^http:\/\/localhost(:\d+)?$/.test(origin))
+        return callback(null, true);
       // Allow explicitly listed origins from env (production domains)
       if (CORS_ORIGIN.includes(origin)) return callback(null, true);
       callback(new Error(`CORS: origin '${origin}' not allowed`));
     },
     credentials: true,
-  })
+  }),
 );
 
 // ── Compression ───────────────────────────────────────────────────────────────
 app.use(compression());
 
 // ── Body parsers ──────────────────────────────────────────────────────────────
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
 // ── Increase request timeout for large file uploads ───────────────────────────
 // Set to 10 minutes for large video uploads
@@ -64,13 +63,13 @@ app.use(mongoSanitize());
 app.use(globalRateLimiter);
 
 // ── Health check ──────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.status(200).json({ success: true, message: 'Streamora API is running' });
+app.get("/health", (req, res) => {
+  res.status(200).json({ success: true, message: "Streamora API is running" });
 });
 
 // ── API routes ────────────────────────────────────────────────────────────────
-const apiRouter = require('./routes/index');
-app.use('/api/v1', apiRouter);
+const apiRouter = require("./routes/index");
+app.use("/api/v1", apiRouter);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res, next) => {

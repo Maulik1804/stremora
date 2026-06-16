@@ -1,12 +1,12 @@
-'use strict';
+"use strict";
 
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const playlistSchema = new mongoose.Schema(
   {
     owner: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: true,
       index: true,
     },
@@ -18,18 +18,18 @@ const playlistSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      default: '',
+      default: "",
       maxlength: 500,
     },
     visibility: {
       type: String,
-      enum: ['public', 'private'],
-      default: 'public',
+      enum: ["public", "private"],
+      default: "public",
     },
     videos: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Video',
+        ref: "Video",
       },
     ],
     isWatchLater: {
@@ -40,14 +40,14 @@ const playlistSchema = new mongoose.Schema(
     collaborators: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: "User",
       },
     ],
 
     // Pending collaborator invites (awaiting approval)
     pendingCollaborators: [
       {
-        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         invitedAt: { type: Date, default: Date.now },
       },
     ],
@@ -55,9 +55,13 @@ const playlistSchema = new mongoose.Schema(
     // Collab video upload requests (videos proposed by collaborators, need owner approval)
     collabVideoRequests: [
       {
-        video: { type: mongoose.Schema.Types.ObjectId, ref: 'Video' },
-        proposedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+        video: { type: mongoose.Schema.Types.ObjectId, ref: "Video" },
+        proposedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        status: {
+          type: String,
+          enum: ["pending", "approved", "rejected"],
+          default: "pending",
+        },
         requestedAt: { type: Date, default: Date.now },
       },
     ],
@@ -72,13 +76,14 @@ const playlistSchema = new mongoose.Schema(
     },
     seriesThumbnail: {
       type: String,
-      default: '',
+      default: "",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 playlistSchema.index({ owner: 1, visibility: 1 });
 playlistSchema.index({ collaborators: 1 });
+playlistSchema.index({ owner: 1, isSeries: 1, visibility: 1, createdAt: -1 });
 
-module.exports = mongoose.model('Playlist', playlistSchema);
+module.exports = mongoose.model("Playlist", playlistSchema);

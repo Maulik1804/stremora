@@ -1,50 +1,84 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Play, TrendingUp, Music, Gamepad2, Newspaper, Trophy, BookOpen, Shirt, Radio, Mic2 } from 'lucide-react';
-import VideoGrid from '../components/video/VideoGrid';
-import Spinner from '../components/ui/Spinner';
-import EmptyState from '../components/ui/EmptyState';
-import ErrorState from '../components/ui/ErrorState';
-import ContinueWatching from '../components/features/ContinueWatching';
-import WatchLaterReminder from '../components/features/WatchLaterReminder';
-import SmartPlaylists from '../components/features/SmartPlaylists';
-import TrendingRealtime from '../components/features/TrendingRealtime';
-import GoalWidget from '../components/features/GoalWidget';
-import { videoService } from '../services/video.service';
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Play,
+  TrendingUp,
+  Music,
+  Gamepad2,
+  Newspaper,
+  Trophy,
+  BookOpen,
+  Shirt,
+  Radio,
+  Mic2,
+} from "lucide-react";
+import VideoGrid from "../components/video/VideoGrid";
+import Spinner from "../components/ui/Spinner";
+import EmptyState from "../components/ui/EmptyState";
+import ErrorState from "../components/ui/ErrorState";
+import { videoService } from "../services/video.service";
+
+const ContinueWatching = lazy(
+  () => import("../components/features/ContinueWatching"),
+);
+const WatchLaterReminder = lazy(
+  () => import("../components/features/WatchLaterReminder"),
+);
+const SmartPlaylists = lazy(
+  () => import("../components/features/SmartPlaylists"),
+);
+const TrendingRealtime = lazy(
+  () => import("../components/features/TrendingRealtime"),
+);
+const GoalWidget = lazy(() => import("../components/features/GoalWidget"));
 
 const CATEGORIES = [
-  { label: 'All',       icon: null },
-  { label: 'Trending',  icon: TrendingUp },
-  { label: 'Music',     icon: Music },
-  { label: 'Gaming',    icon: Gamepad2 },
-  { label: 'News',      icon: Newspaper },
-  { label: 'Sports',    icon: Trophy },
-  { label: 'Learning',  icon: BookOpen },
-  { label: 'Fashion',   icon: Shirt },
-  { label: 'Podcasts',  icon: Mic2 },
-  { label: 'Live',      icon: Radio },
+  { label: "All", icon: null },
+  { label: "Trending", icon: TrendingUp },
+  { label: "Music", icon: Music },
+  { label: "Gaming", icon: Gamepad2 },
+  { label: "News", icon: Newspaper },
+  { label: "Sports", icon: Trophy },
+  { label: "Learning", icon: BookOpen },
+  { label: "Fashion", icon: Shirt },
+  { label: "Podcasts", icon: Mic2 },
+  { label: "Live", icon: Radio },
 ];
 
 const Home = () => {
   const loaderRef = useRef(null);
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeCategory, setActiveCategory] = useState("All");
 
   const {
-    data, fetchNextPage, hasNextPage, isFetchingNextPage,
-    isLoading, isError, refetch,
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isError,
+    refetch,
   } = useInfiniteQuery({
-    queryKey: ['feed', activeCategory],
-    queryFn: ({ pageParam }) => videoService.getFeed(pageParam).then((r) => r.data.data),
+    queryKey: ["feed"],
+    queryFn: ({ pageParam }) =>
+      videoService.getFeed(pageParam).then((r) => r.data.data),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
+
+  const widgetFallback = (
+    <div className="mx-auto max-w-screen-2xl px-4 py-4">
+      <div className="skeleton h-24 rounded-2xl" />
+    </div>
+  );
 
   useEffect(() => {
     const el = loaderRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && hasNextPage) fetchNextPage(); },
-      { threshold: 0.1 }
+      ([entry]) => {
+        if (entry.isIntersecting && hasNextPage) fetchNextPage();
+      },
+      { threshold: 0.1 },
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -70,12 +104,16 @@ const Home = () => {
                 className={`
                   flex items-center gap-1.5 flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium
                   transition-all duration-200
-                  ${active
-                    ? 'chip-active'
-                    : 'bg-[#1a1a1a] text-[#888] hover:bg-[#222] hover:text-[#e0e0e0] border border-white/5'}
+                  ${
+                    active
+                      ? "chip-active"
+                      : "bg-[#1a1a1a] text-[#888] hover:bg-[#222] hover:text-[#e0e0e0] border border-white/5"
+                  }
                 `}
               >
-                {Icon && <Icon size={12} className={active ? 'text-[#080808]' : ''} />}
+                {Icon && (
+                  <Icon size={12} className={active ? "text-[#080808]" : ""} />
+                )}
                 {label}
               </motion.button>
             );
@@ -85,22 +123,48 @@ const Home = () => {
 
       {/* ── Content ── */}
       <div className="px-4 py-6 max-w-screen-2xl mx-auto w-full">
-        <WatchLaterReminder />
-        <GoalWidget />
-        <TrendingRealtime hours={2} />
-        <ContinueWatching />
+        <Suspense fallback={widgetFallback}>
+          <WatchLaterReminder />
+        </Suspense>
+        <Suspense fallback={widgetFallback}>
+          <GoalWidget />
+        </Suspense>
+        <Suspense fallback={widgetFallback}>
+          <TrendingRealtime hours={2} />
+        </Suspense>
+        <Suspense fallback={widgetFallback}>
+          <ContinueWatching />
+        </Suspense>
 
         <AnimatePresence mode="wait">
           {isError ? (
-            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <ErrorState title="Failed to load videos" description="Check your connection and try again." onRetry={refetch} />
+            <motion.div
+              key="error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <ErrorState
+                title="Failed to load videos"
+                description="Check your connection and try again."
+                onRetry={refetch}
+              />
             </motion.div>
           ) : (
-            <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div
+              key="content"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
               <VideoGrid videos={videos} isLoading={isLoading} />
 
               {!isLoading && videos.length === 0 && (
-                <EmptyState icon={Play} title="No videos yet" description="Be the first to upload content to Streamora." />
+                <EmptyState
+                  icon={Play}
+                  title="No videos yet"
+                  description="Be the first to upload content to Streamora."
+                />
               )}
 
               <div ref={loaderRef} className="flex justify-center py-10">
@@ -119,7 +183,11 @@ const Home = () => {
                 </motion.p>
               )}
 
-              {!isLoading && videos.length > 0 && <SmartPlaylists />}
+              {!isLoading && videos.length > 0 && (
+                <Suspense fallback={widgetFallback}>
+                  <SmartPlaylists />
+                </Suspense>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,16 +1,17 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Play, Clock } from 'lucide-react';
-import Avatar from '../ui/Avatar';
-import { formatDistanceToNow } from '../../utils/date';
-import { formatCount, formatDuration } from '../../utils/format';
+import { memo, useState } from "react";
+import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Play, Clock } from "lucide-react";
+import Avatar from "../ui/Avatar";
+import { formatDistanceToNow } from "../../utils/date";
+import { formatCount, formatDuration } from "../../utils/format";
 
 // ── Horizontal card (suggested sidebar) ──────────────────────────────────────
 const HorizontalCard = ({ video }) => {
   const [imgError, setImgError] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const { _id, title, thumbnailUrl, duration, viewCount, createdAt, owner } = video;
+  const { _id, title, thumbnailUrl, duration, viewCount, createdAt, owner } =
+    video;
 
   return (
     <motion.article
@@ -21,14 +22,20 @@ const HorizontalCard = ({ video }) => {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <Link to={`/watch/${_id}`}
-        className="relative flex-shrink-0 w-40 aspect-video rounded-xl overflow-hidden bg-[#111]">
+      <Link
+        to={`/watch/${_id}`}
+        className="relative shrink-0 w-40 aspect-video rounded-xl overflow-hidden bg-[#111]"
+      >
         {thumbnailUrl && !imgError ? (
           <motion.img
-            src={thumbnailUrl} alt={title} loading="lazy"
+            src={thumbnailUrl}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
             onError={() => setImgError(true)}
             animate={{ scale: hovered ? 1.06 : 1 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             className="w-full h-full object-cover"
           />
         ) : (
@@ -53,12 +60,16 @@ const HorizontalCard = ({ video }) => {
       </Link>
 
       <div className="flex flex-col gap-0.5 min-w-0 flex-1 py-0.5">
-        <Link to={`/watch/${_id}`}
-          className="text-xs font-medium text-[#e0e0e0] line-clamp-2 leading-snug hover:text-white transition-colors">
+        <Link
+          to={`/watch/${_id}`}
+          className="text-xs font-medium text-[#e0e0e0] line-clamp-2 leading-snug hover:text-white transition-colors"
+        >
           {title}
         </Link>
-        <Link to={`/channel/${owner?.username}`}
-          className="text-[11px] text-[#666] hover:text-[#ccc] transition-colors mt-0.5">
+        <Link
+          to={`/channel/${owner?.username}`}
+          className="text-[11px] text-[#666] hover:text-[#ccc] transition-colors mt-0.5"
+        >
           {owner?.displayName || owner?.username}
         </Link>
         <p className="text-[11px] text-[#444] mt-0.5">
@@ -73,7 +84,8 @@ const HorizontalCard = ({ video }) => {
 const VerticalCard = ({ video, index = 0 }) => {
   const [imgError, setImgError] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const { _id, title, thumbnailUrl, duration, viewCount, createdAt, owner } = video;
+  const { _id, title, thumbnailUrl, duration, viewCount, createdAt, owner } =
+    video;
 
   return (
     <motion.article
@@ -85,18 +97,24 @@ const VerticalCard = ({ video, index = 0 }) => {
       onMouseLeave={() => setHovered(false)}
     >
       {/* Thumbnail */}
-      <Link to={`/watch/${_id}`}
-        className="relative block aspect-video rounded-2xl overflow-hidden bg-[#111] ring-1 ring-white/4 card-hover-ring transition-all duration-300">
+      <Link
+        to={`/watch/${_id}`}
+        className="relative block aspect-video rounded-2xl overflow-hidden bg-[#111] ring-1 ring-white/4 card-hover-ring transition-all duration-300"
+      >
         {thumbnailUrl && !imgError ? (
           <motion.img
-            src={thumbnailUrl} alt={title} loading="lazy"
+            src={thumbnailUrl}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
             onError={() => setImgError(true)}
             animate={{ scale: hovered ? 1.05 : 1 }}
             transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#111] to-[#1a1a1a]">
+          <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-[#111] to-[#1a1a1a]">
             <Play size={28} className="text-[#333]" />
           </div>
         )}
@@ -105,13 +123,13 @@ const VerticalCard = ({ video, index = 0 }) => {
         <motion.div
           animate={{ opacity: hovered ? 1 : 0 }}
           transition={{ duration: 0.22 }}
-          className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"
+          className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent"
         />
 
         {/* Play button */}
         <motion.div
           animate={{ opacity: hovered ? 1 : 0, scale: hovered ? 1 : 0.75 }}
-          transition={{ duration: 0.22, ease: 'easeOut' }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
           className="absolute inset-0 flex items-center justify-center"
         >
           <div className="bg-black/65 backdrop-blur-md rounded-full p-3.5 ring-1 ring-white/15 shadow-xl">
@@ -133,11 +151,14 @@ const VerticalCard = ({ video, index = 0 }) => {
 
       {/* Meta */}
       <div className="flex gap-3">
-        <Link to={`/channel/${owner?.username}`} className="flex-shrink-0 mt-0.5">
-          <motion.div whileHover={{ scale: 1.08 }} transition={{ type: 'spring', stiffness: 400, damping: 20 }}>
+        <Link to={`/channel/${owner?.username}`} className="shrink-0 mt-0.5">
+          <motion.div
+            whileHover={{ scale: 1.08 }}
+            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+          >
             <Avatar
               src={owner?.avatar}
-              alt={owner?.displayName || owner?.username || ''}
+              alt={owner?.displayName || owner?.username || ""}
               size="sm"
               className="ring-1 ring-white/8 hover:ring-white/20 transition-all duration-200"
             />
@@ -145,12 +166,16 @@ const VerticalCard = ({ video, index = 0 }) => {
         </Link>
 
         <div className="flex flex-col gap-0.5 min-w-0">
-          <Link to={`/watch/${_id}`}
-            className="text-sm font-medium text-[#e8e8e8] line-clamp-2 leading-snug hover:text-white transition-colors">
+          <Link
+            to={`/watch/${_id}`}
+            className="text-sm font-medium text-text-primary line-clamp-2 leading-snug hover:text-white transition-colors"
+          >
             {title}
           </Link>
-          <Link to={`/channel/${owner?.username}`}
-            className="text-xs text-[#666] hover:text-[#ccc] transition-colors mt-0.5">
+          <Link
+            to={`/channel/${owner?.username}`}
+            className="text-xs text-[#666] hover:text-[#ccc] transition-colors mt-0.5"
+          >
             {owner?.displayName || owner?.username}
           </Link>
           <p className="text-xs text-[#444] mt-0.5">
@@ -164,7 +189,11 @@ const VerticalCard = ({ video, index = 0 }) => {
 
 const VideoCard = ({ video, horizontal = false, index = 0 }) => {
   if (!video) return null;
-  return horizontal ? <HorizontalCard video={video} /> : <VerticalCard video={video} index={index} />;
+  return horizontal ? (
+    <HorizontalCard video={video} />
+  ) : (
+    <VerticalCard video={video} index={index} />
+  );
 };
 
-export default VideoCard;
+export default memo(VideoCard);
