@@ -49,7 +49,8 @@ const loginValidation = [
 
 router.post('/register', registerValidation, validate, register);
 router.post('/login', loginValidation, validate, login);
-router.post('/logout', verifyJWT, logout);
+// Logout should work even if the access token is not present (uses refresh cookie).
+router.post('/logout', logout);
 router.post('/refresh', refreshToken);
 
 router.post(

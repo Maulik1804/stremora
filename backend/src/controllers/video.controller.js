@@ -712,8 +712,16 @@ const getUploadSignature = asyncHandler(async (req, res) => {
   const timestamp = Math.round(Date.now() / 1000);
   const folder = resourceType === 'image' ? 'streamora/thumbnails' : 'streamora/videos';
 
+  // Build params to sign
+  const paramsToSign = { timestamp, folder };
+
+  // For images (thumbnails), include transformation in signature
+  if (resourceType === 'image') {
+    paramsToSign.transformation = 'w_1280,h_720,c_fill,q_auto,f_auto';
+  }
+
   const signature = cloudinaryInstance.utils.api_sign_request(
-    { timestamp, folder },
+    paramsToSign,
     process.env.CLOUDINARY_API_SECRET
   );
 
@@ -721,6 +729,7 @@ const getUploadSignature = asyncHandler(async (req, res) => {
     signature,
     timestamp,
     folder,
+    transformation: paramsToSign.transformation,
     apiKey: CLOUDINARY_API_KEY,
     cloudName: CLOUDINARY_CLOUD_NAME,
   }));

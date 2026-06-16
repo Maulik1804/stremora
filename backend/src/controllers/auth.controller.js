@@ -127,7 +127,35 @@ const login = asyncHandler(async (req, res) => {
  * Requires: verifyJWT middleware
  */
 const logout = asyncHandler(async (req, res) => {
-  await clearRefreshToken(req.user._id);
+  // DEBUG: log incoming auth headers and cookies to help diagnose bad requests
+  try {
+    console.log('[logout] headers:', { authorization: req.headers.authorization });
+    console.log('[logout] cookies:', req.cookies);
+  } catch (err) {
+    console.log('[logout] debug log failed', err);
+  }
+  // Determine user id from either the authenticated user (access token)
+  // or from the refresh token cookie. Logout should be idempotent and
+  // succeed even if no valid tokens are present.
+  let userId = null;
+  if (req.user && req.user._id) {
+    userId = req.user._id;
+  } else {
+    const incoming = req.cookies[REFRESH_TOKEN_COOKIE_NAME];
+    if (incoming) {
+      try {
+        const decoded = jwt.verify(incoming, REFRESH_TOKEN_SECRET);
+        userId = decoded._id;
+      } catch (err) {
+        // ignore — token invalid/expired
+      }
+    }
+  }
+
+  if (userId) {
+    await clearRefreshToken(userId);
+  }
+
   clearRefreshCookie(res);
 
   return res

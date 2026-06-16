@@ -16,7 +16,18 @@ const authApi = axios.create({
 export const authService = {
   register: (data)  => authApi.post('/auth/register', data),
   login:    (data)  => authApi.post('/auth/login', data),
-  logout:   ()      => authApi.post('/auth/logout'),
+  logout:   ()      => {
+    // Attach access token header if present in sessionStorage to help
+    // backends that expect Authorization on logout. The refresh cookie
+    // will still be sent via withCredentials.
+    try {
+      const token = sessionStorage.getItem('streamora_at');
+      if (token) return authApi.post('/auth/logout', null, { headers: { Authorization: `Bearer ${token}` } });
+    } catch (err) {
+      /* ignore */
+    }
+    return authApi.post('/auth/logout');
+  },
   refresh:  ()      => authApi.post('/auth/refresh'),
   // /users/me goes through the intercepted instance so it can auto-refresh
   getMe:    ()      => api.get('/users/me'),

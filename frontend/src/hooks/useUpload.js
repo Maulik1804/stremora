@@ -188,15 +188,23 @@ export const useUpload = () => {
           thumbFd.append('api_key', thumbSig.apiKey);
           thumbFd.append('timestamp', thumbSig.timestamp);
           thumbFd.append('signature', thumbSig.signature);
-          thumbFd.append('folder', 'streamora/thumbnails');
-          thumbFd.append('resource_type', 'image');
-          thumbFd.append('transformation', 'w_1280,h_720,c_fill,q_auto');
+          thumbFd.append('folder', thumbSig.folder);
+          
+          // Include transformation if provided by backend
+          if (thumbSig.transformation) {
+            thumbFd.append('transformation', thumbSig.transformation);
+          }
 
           const thumbRes = await fetch(
             `https://api.cloudinary.com/v1_1/${thumbSig.cloudName}/image/upload`,
             { method: 'POST', body: thumbFd }
           );
           const thumbData = await thumbRes.json();
+          
+          if (!thumbRes.ok) {
+            throw new Error(thumbData.error?.message || 'Thumbnail upload failed');
+          }
+          
           if (thumbData.secure_url) {
             thumbnailUrl = thumbData.secure_url;
             console.log('[Upload] Thumbnail uploaded:', thumbnailUrl);
